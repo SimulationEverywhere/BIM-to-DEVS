@@ -33,9 +33,24 @@ class CadmiumExtension extends Autodesk.Viewing.Extension {
         // Button for exporting CO2 JSON configuration files
         this._button = new Autodesk.Viewing.UI.Button('co2CadmiumExtensionButton');
         this._button.onClick = (ev) => {
-            // Execute an action here
-
-            alert("Not implemented yet! It has to export the model information to a Cadmium JSON file (CO2 model).");
+            //alert("Not implemented yet! It has to export the model information to a Cadmium JSON file (CO2 model).");
+            // Get current selection
+            const selection = this.viewer.getSelection();
+            this.viewer.clearSelection();
+            // Anything selected?
+            if (selection.length > 0) {
+                // Iterate through the list of selected dbIds
+                selection.forEach((dbId) => {
+                    // Get properties of each dbId
+                    this.viewer.getProperties(dbId, (props) => {
+                        // Output properties to console
+                        console.log(props);
+                    });
+                });
+            } else {
+                // If nothing selected, restore
+                this.viewer.isolate(0);
+            }
         };
         this._button.setToolTip('Export JSON for CO2 model');
         this._button.addClass('co2CadmiumExtensionIcon');

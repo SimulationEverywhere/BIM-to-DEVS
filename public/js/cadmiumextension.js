@@ -1,4 +1,6 @@
+
 class CadmiumExtension extends Autodesk.Viewing.Extension {
+    
     constructor(viewer, options) {
         super(viewer, options);
         this._group = null;
@@ -34,30 +36,11 @@ class CadmiumExtension extends Autodesk.Viewing.Extension {
         this._button = new Autodesk.Viewing.UI.Button('co2CadmiumExtensionButton');
         this._button.onClick = (ev) => {
             //alert("Not implemented yet! It has to export the model information to a Cadmium JSON file (CO2 model).");
-            // For now I count the walls here...
-
-            // Get current selection
-            const selection = this.viewer.getSelection();
-            this.viewer.clearSelection();
-            var countWalls = 0;
-
-            // Anything selected?
-            if (selection.length > 0) {
-                viewer.model.getBulkProperties(selection, ['Category'],
-                function(elements){
-                    var totalWalls = 0;
-                    for(var i=0; i<elements.length; i++){
-                    console.log(elements[i].properties[0].displayValue);
-                        if(elements[i].properties[0].displayValue == "Revit Walls") {
-                                totalWalls += 1;//elements[i].properties[0].displayValue;
-                        }
-                    }
-                    console.log("Total walls: " + totalWalls);
-                    alert("Total walls: " + totalWalls);
-                });
-            } else {
-                alert("Nothing selected.");
-            }
+            
+            // Some basic functionalities to practice:
+            //this.showNumWallsFromSelection();
+            //this.showOverallNumWalls();
+            this.extractAllWallsDict();
         };
         this._button.setToolTip('Export JSON for CO2 model');
         this._button.addClass('co2CadmiumExtensionIcon');
@@ -73,6 +56,136 @@ class CadmiumExtension extends Autodesk.Viewing.Extension {
         this._button.addClass('epidemicsExtensionIcon');
         this._group.addControl(this._button);
     }
+
+    // ----------------------------------------
+    // CUSTOM FUNCTIONS
+    // ----------------------------------------
+
+    showNumWallsFromSelection() {
+        const selection = this.viewer.getSelection();
+        //this.viewer.clearSelection();
+        var countWalls = 0;
+
+        // Anything selected?
+        if (selection.length > 0) {
+            this.showNumWalls(selection);
+        } else {
+            alert("Nothing selected.");
+        }
+    }
+
+    showOverallNumWalls() {
+        var ids = viewer.model.getData().instanceTree.nodeAccess.dbIdToIndex;
+        this.showNumWalls(ids);
+    }
+
+    showNumWalls(ids) {
+        viewer.model.getBulkProperties(ids, ['Category'],
+            function(elements){
+                var totalWalls = 0;
+                var data = [];
+                for(var i=0; i<elements.length; i++){
+                    console.log(elements[i].properties[0].displayValue);
+                    if(elements[i].properties[0].displayValue == "Revit Walls") {
+                            totalWalls += 1;
+                            data.push({"id": elements[i].dbId});
+                    }
+                }
+                console.log("Total walls: " + totalWalls);
+                console.log(data);
+                alert("Total walls: " + totalWalls);
+            }
+        );
+    }
+
+    extractObjDict(ids) {
+        var saveJson = this.saveJSON;
+        viewer.model.getBulkProperties(ids, ['Category'],
+            function(elements){
+                var data = [];
+                for(var i=0; i<elements.length; i++){
+                    if(elements[i].properties[0].displayValue == "Revit Walls") {
+                            var f = new Float32Array(6);
+                            var us = viewer.model.getUnitScale();
+                            viewer.model.getInstanceTree().getNodeBox(elements[i].dbId, f);
+                            var bbox = f.map((e) => {return e*us});
+                            data.push({"id": elements[i].dbId, "bbox": bbox});
+                    }
+                }
+                var dataStr = JSON.stringify(data).replace(/\"([^(\")"]+)\":/g,"$1:");
+                saveJson(dataStr);
+            }
+        );
+    }
+
+    extractAllWallsDict() {
+        var ids = viewer.model.getData().instanceTree.nodeAccess.dbIdToIndex;
+        this.extractObjDict(ids);
+    }
+
+    saveJSON(dataStr) {  
+        // TODO: save file (issue: can't import fs from this file...)
+        // const fs = require('fs');
+        // fs.writeFileSync('out.json', dataStr);
+        alert(dataStr);
+    }
+
+    // ----------------------------------------
+    // UTILS
+    // ----------------------------------------
+
+    getBoundingBox(id) {
+        var f = new Float32Array(6);
+        var us = this.viewer.model.getUnitScale();
+        this.viewer.model.getInstanceTree().getNodeBox(id, f);
+        fs = f.map((e) => {return e*us});
+        return fs;
+    }
+
+    /*getLeafFragIds( model, leafId ) {
+        const instanceTree = model.getData().instanceTree;
+        const fragIds = [];
+
+        instanceTree.enumNodeFragments( leafId, function( fragId ) {
+            fragIds.push( fragId );
+        });
+
+        return fragIds;
+    }
+    
+    getComponentGeometry( viewer, dbId ) {
+        const fragIds = getLeafFragIds( viewer.model, dbId );
+
+        let matrixWorld = null;
+
+        const meshes = fragIds.map( function( fragId ) {
+
+            const renderProxy = viewer.impl.getRenderProxy( viewer.model, fragId );
+
+            const geometry = renderProxy.geometry;
+            const attributes = geometry.attributes;
+            const positions = geometry.vb ? geometry.vb : attributes.position.array;
+
+            const indices = attributes.index.array || geometry.ib;
+            const stride = geometry.vb ? geometry.vbstride : 3;
+            const offsets = geometry.offsets;
+
+            matrixWorld = matrixWorld || renderProxy.matrixWorld.elements;
+
+            return {
+            positions,
+            indices,
+            offsets,
+            stride
+            };
+        });
+
+        return {
+            matrixWorld,
+            meshes
+        };
+    }*/
+    
 }
 
 Autodesk.Viewing.theExtensionManager.registerExtension('CadmiumExtension', CadmiumExtension);

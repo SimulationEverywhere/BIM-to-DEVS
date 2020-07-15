@@ -114,13 +114,15 @@ class CadmiumExtension extends Autodesk.Viewing.Extension {
             function(elements){
                 var data = [];
                 for(var i=0; i<elements.length; i++){
-                    if(elements[i].properties[0].displayValue == "Revit Walls") {
+                    var category = elements[i].properties[0].displayValue;
+                    if(category == "Revit Walls" || category == "Revit Windows" || category == "Revit Doors") {
                             var f = new Float32Array(6);
                             var us = viewer.model.getUnitScale();
                             viewer.model.getInstanceTree().getNodeBox(elements[i].dbId, f);
                             var bbox = f.map((e) => {return e*us});
                             bbox = Array.prototype.slice.call(bbox);
-                            data.push({"id": elements[i].dbId, "bbox": bbox});
+                            var objType = category.substring(6, category.length-1);
+                            data.push({"id": elements[i].dbId, "type": objType, "bbox": bbox});
                     }
                 }
                 var dataStr = JSON.stringify(data).replace(/\"([^(\")"]+)\":/g,"$1:");

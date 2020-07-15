@@ -119,6 +119,7 @@ class CadmiumExtension extends Autodesk.Viewing.Extension {
                             var us = viewer.model.getUnitScale();
                             viewer.model.getInstanceTree().getNodeBox(elements[i].dbId, f);
                             var bbox = f.map((e) => {return e*us});
+                            bbox = Array.prototype.slice.call(bbox);
                             data.push({"id": elements[i].dbId, "bbox": bbox});
                     }
                 }

@@ -40,7 +40,17 @@ class CadmiumExtension extends Autodesk.Viewing.Extension {
             // Some basic functionalities to practice:
             //this.showNumWallsFromSelection();
             //this.showOverallNumWalls();
-            this.extractAllWallsDict();
+
+            // Download JSON with the bboxes of some interest objects (walls for now)
+            // If something is selected, the extraction will be done with the selection
+            // Else, the extraction is done with the entire model
+            const selection = this.viewer.getSelection();
+            //this.viewer.clearSelection();
+            if (selection.length > 0) {
+                this.extractWallsDictFromSelection();
+            } else {
+                this.extractAllWallsDict();
+            }
         };
         this._button.setToolTip('Export JSON for CO2 model');
         this._button.addClass('co2CadmiumExtensionIcon');
@@ -113,7 +123,8 @@ class CadmiumExtension extends Autodesk.Viewing.Extension {
                     }
                 }
                 var dataStr = JSON.stringify(data).replace(/\"([^(\")"]+)\":/g,"$1:");
-                saveJson(dataStr);
+                alert(dataStr);
+                CadmiumExtension.download(dataStr, "config.json", "application/json");
             }
         );
     }
@@ -123,11 +134,27 @@ class CadmiumExtension extends Autodesk.Viewing.Extension {
         this.extractObjDict(ids);
     }
 
-    saveJSON(dataStr) {  
-        // TODO: save file (issue: can't import fs from this file...)
-        // const fs = require('fs');
-        // fs.writeFileSync('out.json', dataStr);
-        alert(dataStr);
+    extractWallsDictFromSelection() {
+        const selection = this.viewer.getSelection();
+        this.extractObjDict(selection);
+    }
+
+    static download(data, filename, type) {
+        var file = new Blob([data], {type: type});
+        if (window.navigator.msSaveOrOpenBlob) // IE10+
+            window.navigator.msSaveOrOpenBlob(file, filename);
+        else { // Others
+            var a = document.createElement("a"),
+                    url = URL.createObjectURL(file);
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(function() {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);  
+            }, 0); 
+        }
     }
 
     // ----------------------------------------

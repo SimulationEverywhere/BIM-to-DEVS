@@ -1,18 +1,18 @@
 {
-  "name": "firsttry",
+  "name": "bim",
   "version": "1.0.0",
-  "description": "First try at forge",
+  "description": "",
   "main": "start.js",
   "scripts": {
+    "start": "node start.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "Vinu",
+  "author": "Saif Rahman",
   "license": "ISC",
   "dependencies": {
     "cookie-session": "^1.4.0",
     "express": "^4.17.1",
     "forge-apis": "^0.7.3",
-    "forge-convert-utils": "^3.5.0",
     "multer": "^1.4.2"
   }
 }

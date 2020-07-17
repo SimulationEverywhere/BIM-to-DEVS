@@ -1,6 +1,7 @@
 const { OAuth } = require('./common/oauth')
 const express = require('express')
 const request = require('request')
+const request_promise = require('request-promise')
 const os = require('os')
 const fs = require('fs')
 const path = require('path')
@@ -9,7 +10,7 @@ const readline = require('readline');
 
 let router = express.Router();
 
-const view_name = "{3D}"
+const view_name = "3D"
 
 const sql_query_walls = (
     'SELECT DISTINCT '+
@@ -59,9 +60,10 @@ router.get('/extract', async (req, res, next) => {
     const auth_header = {'Authorization':'Bearer '+internalToken.access_token}
 
     request({url:"https://developer.api.autodesk.com/modelderivative/v2/designdata/"+urn+"/metadata", headers:auth_header}, (error, responce, body) => { if(error) throw(error);
-        //console.log(body)
-        var view_metadata = JSON.parse(body).data.metadata.find(x => x.name == view_name)
-        if(!view_metadata) throw("Metadata not found");
+        console.log(urn)
+        console.log(body)
+        var view_metadata = JSON.parse(body).data.metadata.find(x => x.name.includes(view_name))
+        if(!view_metadata) throw("Metadata with "+view_name+"not found, did you want "+JSON.stringify(JSON.parse(body).data.metadata)  );
         var guid = view_metadata.guid
         //console.log(guid)
         var t_url = "https://developer.api.autodesk.com/derivativeservice/v2/derivatives/"+encodeURIComponent("urn:adsk.viewing:fs.file:"+urn)+"/output/Resource/model.sdb"
@@ -102,9 +104,19 @@ router.get('/extract', async (req, res, next) => {
                                             (error, response, body)=>{
                                         if(error) throw(error);
                                         //console.log(body)
-                                        request({url:"https://developer.api.autodesk.com/modelderivative/v2/designdata/"+urn+"/manifest", headers:auth_header}, (error, response, body)=>{if(error) throw(error);
+                                        var options = {url:"https://developer.api.autodesk.com/modelderivative/v2/designdata/"+urn+"/manifest", headers:auth_header}
+                                        request(options, async (error, response, body)=>{if(error) throw(error);
                                             console.log()
                                             console.log(body)
+                                            while(["inprogress","pending"].includes(JSON.parse(body).status)){
+                                            //if(true){"status":"pending"
+                                                console.log(JSON.parse(body).status)
+                                                body = await request_promise(options)
+                                                //console.log(result_value)
+                                                //return
+                                            }
+
+
                                             var obj_manifest = JSON.parse(body).derivatives.find(
                                                 x => (
                                                     x &&

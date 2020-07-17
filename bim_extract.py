@@ -5,8 +5,8 @@ import base64
 import urllib.parse
 
 auth_url = 'https://developer.api.autodesk.com/authentication/v1/authenticate'
-auth_data = {'client_id':'uCGRfVbFJgMK0EYr5J1kmeCgROH9wwSA',
-             'client_secret':'wL8AwIMDGMeggiH5',
+auth_data = {'client_id':'G2wBhWVQygHwUUGaLXoIiYlKGxOYV7yF',
+             'client_secret':'iZzBf6TAZz7wr1kd',
              'grant_type':'client_credentials',
              'scope':'bucket:create bucket:read data:read data:create data:write'}
 
@@ -23,6 +23,8 @@ buckets_data = requests.get(buskets_url, headers=auth_header).json()
 
 #print(json.dumps(buckets_data, indent=4, sort_keys=True))
 
+#exit()
+
 object_id = ''
 
 for item in buckets_data['items']:
@@ -35,30 +37,29 @@ for item in buckets_data['items']:
         #print(object_id)
 
 
-file_manifest_urn_encoded = base64.urlsafe_b64encode(object_id.encode('utf-8'))
+file_manifest_urn_encoded = base64.urlsafe_b64encode(b"urn:adsk.viewing:fs.file:"+b"dXJuOmFkc2sud2lwcHJvZDpmcy5maWxlOnZmLkxhRUNweDhWVEJXR29pd3AwUnVqTWc_dmVyc2lvbj0x")#object_id.encode('utf-8'))
 #print(file_manifest_urn_encoded)
 file_manifest_url = f"https://developer.api.autodesk.com/modelderivative/v2/designdata/{file_manifest_urn_encoded.decode('utf-8')}/manifest"
-#print(file_manifest_url)
+print(file_manifest_url)
 
 file_manifest = requests.get(file_manifest_url, headers=auth_header)
-#print()
-#print(json.dumps(file_manifest, indent=4, sort_keys)
-#print(json.dumps(file_manifest, indent=4, sort_keys=True))
+print(file_manifest.text)
+#print(json.dumps(file_manifest.json(), indent=4, sort_keys=True))
 
-urns = []
+#urns = []
 
 #for derivative in file_manifest['derivatives']:
 
-for line in file_manifest.text.split('"'):
-    if line.startswith("urn:"):
-        urns.append(line)
+#for line in file_manifest.text.split('"'):
+#    if line.startswith("urn:"):
+#        urns.append(line)
 
 #print('\n'.join(urns))
 
-for urn in urns:
-    with open(f"./files/{urn.split('/')[-1]}", mode='wb') as localfile:
-        print(urn)
-        localfile.write(requests.get("https://developer.api.autodesk.com/derivativeservice/v2/derivatives/"+urllib.parse.quote(urn), headers=auth_header).content)
+#for urn in urns:
+#    with open(f"./files/{urn.split('/')[-1]}", mode='wb') as localfile:
+#        print(urn)
+#        localfile.write(requests.get("https://developer.api.autodesk.com/derivativeservice/v2/derivatives/"+urllib.parse.quote(urn), headers=auth_header).content)
 
 
 #https://developer.api.autodesk.com/derivativeservice/v2/derivatives/

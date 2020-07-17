@@ -1,6 +1,6 @@
 
 class CadmiumExtension extends Autodesk.Viewing.Extension {
-    
+
     constructor(viewer, options) {
         super(viewer, options);
         this._group = null;
@@ -36,7 +36,7 @@ class CadmiumExtension extends Autodesk.Viewing.Extension {
         this._button = new Autodesk.Viewing.UI.Button('co2CadmiumExtensionButton');
         this._button.onClick = (ev) => {
             //alert("Not implemented yet! It has to export the model information to a Cadmium JSON file (CO2 model).");
-            
+
             // Some basic functionalities to practice:
             //this.showNumWallsFromSelection();
             //this.showOverallNumWalls();
@@ -76,7 +76,7 @@ class CadmiumExtension extends Autodesk.Viewing.Extension {
             context.fillStyle = "#0000FF";
             context.fillRect(110, 0, 50, 50);
             context.scale(4, 4);
-            
+
         };
         this._button.setToolTip('Export JSON for Epidemic model');
         this._button.addClass('epidemicsExtensionIcon');
@@ -125,6 +125,15 @@ class CadmiumExtension extends Autodesk.Viewing.Extension {
     }*/
 
     extractObjDict(ids) {
+        jQuery.ajax({
+            url: '/api/forge/extract',
+            data:{urn: document.active_urn},
+            success: function(profile) {
+                console.log("extract returned")
+            }
+        })
+    }
+/*
         var thisRef = this;
         viewer.model.getBulkProperties(ids, ['Category'],
             function(elements){
@@ -146,7 +155,7 @@ class CadmiumExtension extends Autodesk.Viewing.Extension {
                 CadmiumExtension.download(dataStr, "config.json", "application/json");
             }
         );
-    }
+    }*/
 
     extractAllWallsDict() {
         var ids = viewer.model.getData().instanceTree.nodeAccess.dbIdToIndex;
@@ -171,8 +180,8 @@ class CadmiumExtension extends Autodesk.Viewing.Extension {
             a.click();
             setTimeout(function() {
                 document.body.removeChild(a);
-                window.URL.revokeObjectURL(url);  
-            }, 0); 
+                window.URL.revokeObjectURL(url);
+            }, 0);
         }
     }
 
@@ -191,11 +200,11 @@ class CadmiumExtension extends Autodesk.Viewing.Extension {
 
     static getDimFromObjDict(elems) {
         if(elems.length == 0) return;
-        var minX = elems[0]["bbox"][0], 
-            minY = elems[0]["bbox"][1], 
-            minZ = elems[0]["bbox"][2], 
-            maxX = elems[0]["bbox"][3], 
-            maxY = elems[0]["bbox"][4], 
+        var minX = elems[0]["bbox"][0],
+            minY = elems[0]["bbox"][1],
+            minZ = elems[0]["bbox"][2],
+            maxX = elems[0]["bbox"][3],
+            maxY = elems[0]["bbox"][4],
             maxZ = elems[0]["bbox"][5];
 
         for(var i=1; i<elems.length; i++){
@@ -238,7 +247,7 @@ class CadmiumExtension extends Autodesk.Viewing.Extension {
         } else if(elem["type"] == "Door") {
             context.strokeStyle = "#00FF00";
         }
-        
+
         if(dstX-srcX < dstY-srcY) {
             context.lineWidth = dstX-srcX;
             srcX += context.lineWidth/2;
@@ -290,7 +299,7 @@ class CadmiumExtension extends Autodesk.Viewing.Extension {
 
         return fragIds;
     }
-    
+
     getComponentGeometry( viewer, dbId ) {
         const fragIds = getLeafFragIds( viewer.model, dbId );
 
@@ -323,7 +332,7 @@ class CadmiumExtension extends Autodesk.Viewing.Extension {
             meshes
         };
     }*/
-    
+
 }
 
 Autodesk.Viewing.theExtensionManager.registerExtension('CadmiumExtension', CadmiumExtension);

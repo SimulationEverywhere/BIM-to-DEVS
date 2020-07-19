@@ -128,8 +128,8 @@ class CadmiumExtension extends Autodesk.Viewing.Extension {
         jQuery.ajax({
             url: '/api/forge/extract',
             data:{urn: document.active_urn},
-            success: function(profile) {
-                console.log("extract returned")
+            success: function(result) {
+                console.log(result)
             }
         })
     }

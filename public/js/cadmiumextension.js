@@ -130,6 +130,7 @@ class CadmiumExtension extends Autodesk.Viewing.Extension {
             data:{urn: document.active_urn},
             success: function(result) {
                 console.log(result)
+                CadmiumExtension.download(JSON.stringify(result), "cadmium_bim_co2.json", "application/json")
             }
         })
     }

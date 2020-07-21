@@ -19,8 +19,9 @@ const catchall = function(x) {
 }
 
 let router = express.Router();
-
+/*
 const query_prototype = {
+    urn: "",//The client give this to us
     view_name: "3D",
     default_state:{"counter": -1, "concentration": 500, "type": -100},
     parts : [
@@ -64,10 +65,10 @@ const query_prototype = {
     ]
 }
 
-
+*/
 router.get('/extract', async (req, res, next) => {
-    const urn = req.query.urn
-    const query = query_prototype;
+    const query = req.query;
+    const urn = query.urn
     const oauth = new OAuth(req.session)
     const internalToken = await oauth.getInternalToken()
     const auth_header = {'Authorization':'Bearer '+internalToken.access_token}

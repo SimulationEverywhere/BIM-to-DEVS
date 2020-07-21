@@ -127,7 +127,51 @@ class CadmiumExtension extends Autodesk.Viewing.Extension {
     extractObjDict(ids) {
         jQuery.ajax({
             url: '/api/forge/extract',
-            data:{urn: document.active_urn},
+
+            data:({
+                urn: document.active_urn,
+                view_name: "3D",
+                default_state:{"counter": -1, "concentration": 500, "type": -100},
+                parts : [
+                    {
+                        name : "walls",
+                        state: {"concentration": 500, "type": -300, "counter": -1},
+                        sql  : ('SELECT DISTINCT '+
+                                '    _objects_id.id AS id '+
+                                'FROM '+
+                                '    _objects_attr '+
+                                '     INNER JOIN _objects_eav ON _objects_eav.attribute_id = _objects_attr.id '+
+                                '     LEFT OUTER JOIN _objects_val ON _objects_eav.value_id = _objects_val.id '+
+                                '     LEFT OUTER JOIN _objects_id ON _objects_eav.entity_id = _objects_id.id '+
+                                'WHERE '+
+                                '     _objects_attr.category = "Category" AND (_objects_val.value = "Revit Walls" OR _objects_val.value = "Revit Floors" OR _objects_val.value = "Revit Roofs");'),
+                    },{
+                        name : "windows",
+                        state: {"concentration": 500, "type": -500, "counter": -1},
+                        sql  : ('SELECT DISTINCT '+
+                                '    _objects_id.id AS id '+
+                                'FROM '+
+                                '    _objects_attr '+
+                                '     INNER JOIN _objects_eav ON _objects_eav.attribute_id = _objects_attr.id '+
+                                '     LEFT OUTER JOIN _objects_val ON _objects_eav.value_id = _objects_val.id '+
+                                '     LEFT OUTER JOIN _objects_id ON _objects_eav.entity_id = _objects_id.id '+
+                                'WHERE '+
+                                '     _objects_attr.category = "Category" AND _objects_val.value = "Revit Windows";'),
+                    },{
+                        name : "doors",
+                        state: {"concentration": 500, "type": -400, "counter": -1},
+                        sql  : ('SELECT DISTINCT '+
+                                '    _objects_id.id AS id '+
+                                'FROM '+
+                                '    _objects_attr '+
+                                '     INNER JOIN _objects_eav ON _objects_eav.attribute_id = _objects_attr.id '+
+                                '     LEFT OUTER JOIN _objects_val ON _objects_eav.value_id = _objects_val.id '+
+                                '     LEFT OUTER JOIN _objects_id ON _objects_eav.entity_id = _objects_id.id '+
+                                'WHERE '+
+                                '     _objects_attr.category = "Category" AND _objects_val.value = "Revit Doors";'),
+                    }
+                ]
+            }),
             success: function(result) {
                 console.log(result)
                 CadmiumExtension.download(JSON.stringify(result), "cadmium_bim_co2.json", "application/json")

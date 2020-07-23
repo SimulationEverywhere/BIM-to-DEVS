@@ -37,3 +37,10 @@ body {
     background-repeat: no-repeat;
     background-position: center;
 }
+
+.pointcloudIcon {
+    background-image: url(/img/Playbutton.png);
+    background-size: 24px;
+    background-repeat: no-repeat;
+    background-position: center;
+}

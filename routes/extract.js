@@ -5,7 +5,7 @@ const request_promise = require('request-promise')
 const os = require('os')
 const fs = require('fs')
 const path = require('path')
-const sqlite = require('sqlite-async')
+const sqlite3 = require('sqlite3')
 const readline = require('readline')
 const OBJFile = require('obj-file-parser')
 const colors = require('colors')
@@ -19,56 +19,52 @@ const catchall = function(x) {
 }
 
 let router = express.Router();
-/*
-const query_prototype = {
-    urn: "",//The client give this to us
-    view_name: "3D",
-    default_state:{"counter": -1, "concentration": 500, "type": -100},
-    parts : [
-        {
-            name : "walls",
-            state: {"concentration": 500, "type": -300, "counter": -1},
-            sql  : ('SELECT DISTINCT '+
-                    '    _objects_id.id AS id '+
-                    'FROM '+
-                    '    _objects_attr '+
-                    '     INNER JOIN _objects_eav ON _objects_eav.attribute_id = _objects_attr.id '+
-                    '     LEFT OUTER JOIN _objects_val ON _objects_eav.value_id = _objects_val.id '+
-                    '     LEFT OUTER JOIN _objects_id ON _objects_eav.entity_id = _objects_id.id '+
-                    'WHERE '+
-                    '     _objects_attr.category = "Category" AND (_objects_val.value = "Revit Walls" OR _objects_val.value = "Revit Floors" OR _objects_val.value = "Revit Roofs");'),
-        },{
-            name : "windows",
-            state: {"concentration": 500, "type": -500, "counter": -1},
-            sql  : ('SELECT DISTINCT '+
-                    '    _objects_id.id AS id '+
-                    'FROM '+
-                    '    _objects_attr '+
-                    '     INNER JOIN _objects_eav ON _objects_eav.attribute_id = _objects_attr.id '+
-                    '     LEFT OUTER JOIN _objects_val ON _objects_eav.value_id = _objects_val.id '+
-                    '     LEFT OUTER JOIN _objects_id ON _objects_eav.entity_id = _objects_id.id '+
-                    'WHERE '+
-                    '     _objects_attr.category = "Category" AND _objects_val.value = "Revit Windows";'),
-        },{
-            name : "doors",
-            state: {"concentration": 500, "type": -400, "counter": -1},
-            sql  : ('SELECT DISTINCT '+
-                    '    _objects_id.id AS id '+
-                    'FROM '+
-                    '    _objects_attr '+
-                    '     INNER JOIN _objects_eav ON _objects_eav.attribute_id = _objects_attr.id '+
-                    '     LEFT OUTER JOIN _objects_val ON _objects_eav.value_id = _objects_val.id '+
-                    '     LEFT OUTER JOIN _objects_id ON _objects_eav.entity_id = _objects_id.id '+
-                    'WHERE '+
-                    '     _objects_attr.category = "Category" AND _objects_val.value = "Revit Doors";'),
-        }
-    ]
-}
 
-*/
+const view_name = "3D"
+
+const sql_query_walls = (
+    'SELECT DISTINCT '+
+    '    _objects_id.id AS id '+
+    'FROM '+
+    '    _objects_attr '+
+    '     INNER JOIN _objects_eav ON _objects_eav.attribute_id = _objects_attr.id '+
+    '     LEFT OUTER JOIN _objects_val ON _objects_eav.value_id = _objects_val.id '+
+    '     LEFT OUTER JOIN _objects_id ON _objects_eav.entity_id = _objects_id.id '+
+    'WHERE '+
+    '     _objects_attr.category = "Category" AND '+
+    '     (_objects_val.value = "Revit Walls" OR _objects_val.value = "Revit Floors" OR _objects_val.value = "Revit Roofs");');
+
+
+const sql_query_windows =(
+    'SELECT DISTINCT '+
+    '    _objects_id.id AS id '+
+    'FROM '+
+    '    _objects_attr '+
+    '     INNER JOIN _objects_eav ON _objects_eav.attribute_id = _objects_attr.id '+
+    '     LEFT OUTER JOIN _objects_val ON _objects_eav.value_id = _objects_val.id '+
+    '     LEFT OUTER JOIN _objects_id ON _objects_eav.entity_id = _objects_id.id '+
+    'WHERE '+
+    '     _objects_attr.category = "Category" AND '+
+    '     _objects_val.value = "Revit Windows";');
+
+const sql_query_doors =(
+    'SELECT DISTINCT '+
+    '    _objects_id.id AS id '+
+    'FROM '+
+    '    _objects_attr '+
+    '     INNER JOIN _objects_eav ON _objects_eav.attribute_id = _objects_attr.id '+
+    '     LEFT OUTER JOIN _objects_val ON _objects_eav.value_id = _objects_val.id '+
+    '     LEFT OUTER JOIN _objects_id ON _objects_eav.entity_id = _objects_id.id '+
+    'WHERE '+
+    '     _objects_attr.category = "Category" AND '+
+    '     _objects_val.value = "Revit Doors";');
+
+
+
+
 router.get('/extract', async (req, res, next) => {
-    const query = req.query;
-    const urn = query.urn
+    const urn = req.query.urn
+
     const oauth = new OAuth(req.session)
     const internalToken = await oauth.getInternalToken()
     const auth_header = {'Authorization':'Bearer '+internalToken.access_token}
@@ -76,7 +72,7 @@ router.get('/extract', async (req, res, next) => {
     request({url:"https://developer.api.autodesk.com/modelderivative/v2/designdata/"+urn+"/metadata", headers:auth_header}, (error, responce, body) => { if(error) throw(error);
         console.log(urn)
         console.log(body)
-        var view_metadata = JSON.parse(body).data.metadata.find(x => x.name.includes(query.view_name || "3D"))
+        var view_metadata = JSON.parse(body).data.metadata.find(x => x.name.includes(view_name))
         if(!view_metadata) throw("Metadata with "+view_name+"not found, did you want "+JSON.stringify(JSON.parse(body).data.metadata)  );
         var guid = view_metadata.guid
         //console.log(guid)
@@ -84,19 +80,32 @@ router.get('/extract', async (req, res, next) => {
         //console.log(t_url)
         request({url:t_url, headers:auth_header, encoding:null}, (error, response, body) => { if (error) throw(error);
             fs.mkdtemp(path.join(os.tmpdir(), urn+"-"), (err, directory) => { if(err) throw err;
-                var db_path = "./last_run/mocel.sdb"//path.join(directory, "model.sdb")
-                fs.writeFile(db_path, body, async (err) => {if (err) throw err;
+                var db_path = path.join(directory, "model.sdb")
+                fs.writeFile(db_path, body, (err) => {if (err) throw err;
+                    let db = new sqlite3.Database(db_path, sqlite3.OPEN_READONLY, (err) => {if (err) throw err;
+                        db.all(sql_query_walls, [], (err, wall_rows) => {if (err) throw err;
+                            db.all(sql_query_windows, [], (err, window_rows) => {if (err) throw err;
+                                db.all(sql_query_doors, [], async (err, door_rows) => {if (err) throw err;
+                                    var wall_ids = wall_rows.map(x => x.id)
+                                    var window_ids = window_rows.map(x => x.id)
+                                    var door_ids = door_rows.map(x => x.id)
 
-                    let db = await sqlite.open(db_path, sqlite.OPEN_READONLY);
-                    var part_ids_promices = query.parts.map((part) => db.all(part.sql, []).then(x => x.map(y => y.id)))
-                    var part_ids = []
-                    await Promise.all(part_ids_promices.map(async (part_promice, index) => {
-                        part_ids[index] = await part_promice
-                        return request_promise.post(
-                                {
-                                    url:"https://developer.api.autodesk.com/modelderivative/v2/designdata/job",
-                                    body:JSON.stringify(
-                                        {
+                                    var wall_data = {
+                                        input:{"urn":urn},
+                                        output:{
+                                            destination:{region:"us"},
+                                            formats: [
+                                                {
+                                                    type: "obj",
+                                                    advanced: {
+                                                        unit:"meter",
+                                                        modelGuid:guid,
+                                                        objectIds: wall_ids
+                                                    }
+                                                }
+                                            ]}
+                                        };
+                                    var window_data = {
                                             input:{"urn":urn},
                                             output:{
                                                 destination:{region:"us"},
@@ -106,48 +115,87 @@ router.get('/extract', async (req, res, next) => {
                                                         advanced: {
                                                             unit:"meter",
                                                             modelGuid:guid,
-                                                            objectIds: part_ids[index]
+                                                            objectIds: window_ids
                                                         }
                                                     }
-                                                ]
-                                            }
-                                        }
-                                    ),
-                                    headers:Object.assign({}, auth_header, {"Content-Type":"application/json; charset=utf-8"})
+                                                ]}
+                                            };
+                                    var door_data = {
+                                            input:{"urn":urn},
+                                            output:{
+                                                destination:{region:"us"},
+                                                formats: [
+                                                    {
+                                                        type: "obj",
+                                                        advanced: {
+                                                            unit:"meter",
+                                                            modelGuid:guid,
+                                                            objectIds:door_ids
+                                                        }
+                                                    }
+                                                ]}
+                                            };
+
+                                    wall_body_p = request_promise.post({  url:"https://developer.api.autodesk.com/modelderivative/v2/designdata/job",
+                                                    body:JSON.stringify(wall_data),
+                                                    headers:Object.assign({}, auth_header, {"Content-Type":"application/json; charset=utf-8"})}).catch(catchall)
+                                    window_body_p = request_promise.post({  url:"https://developer.api.autodesk.com/modelderivative/v2/designdata/job",
+                                                    body:JSON.stringify(window_data),
+                                                    headers:Object.assign({}, auth_header, {"Content-Type":"application/json; charset=utf-8"})}).catch(catchall)
+                                    door_body_p = request_promise.post({  url:"https://developer.api.autodesk.com/modelderivative/v2/designdata/job",
+                                                    body:JSON.stringify(door_data),
+                                                    headers:Object.assign({}, auth_header, {"Content-Type":"application/json; charset=utf-8"})}).catch(catchall)
+                                    //body_p = await Promise.all([wall_body_p, window_body_p, door_body_p])
+                                    await Promise.all([wall_body_p, window_body_p, door_body_p])
+
+                                    //console.log()
+                                    //console.log(body_p[0])
+                                    //console.log()
+                                    //console.log(body_p[1])
+                                    //console.log()
+                                    //console.log(body_p[2])
+                                    //console.log()
+
+                                    var options = {url:"https://developer.api.autodesk.com/modelderivative/v2/designdata/"+urn+"/manifest", headers:auth_header}
+                                    var manifest_body = null
+                                    while(!manifest_body || ["inprogress","pending"].includes(JSON.parse(manifest_body).status)){
+                                        if(manifest_body){console.log(JSON.parse(manifest_body).status)}
+                                        manifest_body = await request_promise(options).catch(catchall)
+                                    }
+                                    console.log()
+                                    console.log(manifest_body)
+                                    console.log()
+
+                                    var obj_manifest = JSON.parse(manifest_body).derivatives.find(x => (x.outputType && x.outputType === "obj"))
+                                    if(!obj_manifest) throw("There is no obj file, try again?");
+
+                                    var wall_manifest   = obj_manifest.children.find(x => (x.objectIds && x.objectIds.every(y => wall_ids.includes(y))))
+                                    var door_manifest   = obj_manifest.children.find(x => (x.objectIds && x.objectIds.every(y => door_ids.includes(y))))
+                                    var window_manifest = obj_manifest.children.find(x => (x.objectIds && x.objectIds.every(y => window_ids.includes(y))))
+                                    if(!wall_manifest || !door_manifest || !window_manifest) throw("There is no obj file, try again?");
+
+                                    console.log()
+                                    console.log(JSON.stringify(wall_manifest))
+                                    console.log()
+                                    console.log(JSON.stringify(door_manifest))
+                                    console.log()
+                                    console.log(JSON.stringify(window_manifest))
+                                    console.log()
+
+                                    var wall_file_p = request_promise({url:"https://developer.api.autodesk.com/derivativeservice/v2/derivatives/"+wall_manifest.urn.split('/').map(x => encodeURIComponent(x)).join('/'), headers:auth_header})
+                                    var door_file_p = request_promise({url:"https://developer.api.autodesk.com/derivativeservice/v2/derivatives/"+door_manifest.urn.split('/').map(x => encodeURIComponent(x)).join('/'), headers:auth_header})
+                                    var window_file_p = request_promise({url:"https://developer.api.autodesk.com/derivativeservice/v2/derivatives/"+window_manifest.urn.split('/').map(x => encodeURIComponent(x)).join('/'), headers:auth_header})
+
+
+                                    res.send(handle_obj_file(new OBJFile(await wall_file_p, "walls").parse(),
+                                                    new OBJFile(await door_file_p, "doors").parse(),
+                                                    new OBJFile(await window_file_p, "windows").parse()))
+
+                                    db.close()
                                 })
-                                }))
-
-
-                    var options = {url:"https://developer.api.autodesk.com/modelderivative/v2/designdata/"+urn+"/manifest", headers:auth_header}
-                    var manifest_body = null
-                    while(!manifest_body || ["inprogress","pending"].includes(JSON.parse(manifest_body).status)){
-                        if(manifest_body){console.log(JSON.parse(manifest_body).status)}
-                        manifest_body = await request_promise(options).catch(catchall)
-                    }
-                    console.log()
-                    console.log(manifest_body)
-                    console.log()
-
-                    var obj_manifest = JSON.parse(manifest_body).derivatives.find(x => (x.outputType && x.outputType === "obj"))
-                    if(!obj_manifest) throw("There is no obj file, try again?");
-
-                    var part_manifests = part_ids.map(ids => obj_manifest.children.find(x => (x.objectIds && x.objectIds.every(y => ids.includes(y)))))
-
-                    if(!part_manifests.every(x => x)) throw("There is no obj file, try again?");
-
-                    part_manifests.forEach(x => console.log("\n"+JSON.stringify(x)))
-                    console.log()
-
-                    obj_files = await Promise.all(part_manifests.map(m => request_promise({url:"https://developer.api.autodesk.com/derivativeservice/v2/derivatives/"+m.urn.split('/').map(x => encodeURIComponent(x)).join('/'), headers:auth_header})
-                                                                .then(async (value) => (new OBJFile(value).parse()))
-                                                                ))
-
-
-                    res.send(
-                        handle_obj_file(query, obj_files)
-                    )
-
-                    db.close()
+                            })
+                        })
+                    })
                 })
             })
         })
@@ -158,9 +206,8 @@ router.get('/extract', async (req, res, next) => {
 
 
 
-function handle_obj_file(query, obj_list){
+function handle_obj_file(wall_obj, door_obj, window_obj){
     const cell_size = 0.25
-    const cell_reach = 0.1
 
 
     const to_cell = (x => Math.floor(x/cell_size))
@@ -175,16 +222,21 @@ function handle_obj_file(query, obj_list){
     //console.log()
 
     //First, make bounding box
-    var max_x = -Infinity
-    var max_y = -Infinity
-    var max_z = -Infinity
+    //I assume that there is at least 1 wall vertex
+    var v = wall_obj.models[0].vertices[0]
 
-    var min_x = Infinity
-    var min_y = Infinity
-    var min_z = Infinity
+    var max_x = v.x
+    var max_y = v.y
+    var max_z = v.z
+
+    var min_x = v.x
+    var min_y = v.y
+    var min_z = v.z
 
     console.log("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
 
+    var obj_list = [wall_obj, door_obj, window_obj]
+    //console.log(obj_list)
     obj_list.forEach(obj => obj.models.forEach(model => model.vertices.forEach(vert => {
         max_x = Math.max(vert.x, max_x)
         max_y = Math.max(vert.y, max_y)
@@ -222,8 +274,7 @@ function handle_obj_file(query, obj_list){
         for(var j = 0; j<y_len; j++){
             space[i].push([])
             for(var k = 0; k<z_len; k++){
-                space[i][j].push([])
-                query.parts.forEach(_ => space[i][j][k].push(false))
+                space[i][j].push([false, false, false, false, false, false])
             }
         }
     }
@@ -340,35 +391,42 @@ function handle_obj_file(query, obj_list){
     })
 
 
-    obj_list.forEach((obj_file, index) => apply_obj(obj_file, index, cell_reach))
 
-    //flood_space(0, 1, [2,3,4,5])
-    //flood_space(2, 3, [])
-    //flood_space(4, 5, [])
+    apply_obj(wall_obj, 0, 0.1)
+    apply_obj(door_obj, 2, 0.125)
+    apply_obj(window_obj, 4, 0.125)
 
-    var symbols = ['#'.brightBlue, 'D'.brightRed, 'W'.brightGreen, 'C'.prightPurple, 'V'.brightCyan]
-
+    flood_space(0, 1, [2,3,4,5])
+    flood_space(2, 3, [])
+    flood_space(4, 5, [])
+    /*
     for(var z = 0; z<z_len; z++){
-        console.log("\nz = "+z.toString().padStart(3)+"  01234567890123456789012345678901234567890123456789")
+        console.log("\nz = "+z.toString().padStart(3)+"  0123456789012345678901234567890123456789012")
         for(var y = 0; y<y_len; y++){
             console.log("y = "+y.toString().padStart(3)+": " + space.map(x => x[y][z]).map(data => {
-                var index = -1
-                data.forEach((flag, i) => {if(flag){index = i}})
-                //console.log(data)
-                //console.log(index)
-                if(index >= 0){
-                    return symbols[index]
+                if(data[4]){
+                    return 'G'.brightGreen
+                }else if(!data[5]){
+                    return 'g'.green
+                }else if(data[2]){
+                    return 'D'.brightRed
+                }else if(!data[3]){
+                    return 'd'.red
+                }else if(data[0]){
+                    return '#'.brightBlue
+                }else if(!data[1]){
+                    return '.'.blue
                 }else{
                     return ' '
                 }
             }).join(''))
         }
     }
-
-    return make_devs_json(query, space, x_off, y_off, z_off)
+    */
+    return make_devs_json(space, x_off, y_off, z_off)
 }
 
-function make_devs_json(query, space, x_off, y_off, z_off){
+function make_devs_json(space, x_off, y_off, z_off){
     var devs = {
         "scenario": {
             "offset_vector" : [x_off, y_off, z_off],
@@ -376,7 +434,11 @@ function make_devs_json(query, space, x_off, y_off, z_off){
             "wrapped": false,
             "default_delay": "transport",
             "default_cell_type": "CO2_cell",
-            "default_state": query.default_state,
+            "default_state": {
+                "counter": -1,
+                "concentration": 500,
+                "type": -100
+            },
             "default_config": {
                 "CO2_cell": {
                     "conc_increase": 143.2,
@@ -398,11 +460,20 @@ function make_devs_json(query, space, x_off, y_off, z_off){
     for(var x = 0; x<space.length; x++){
         for(var y = 0; y<space[x].length; y++){
             for(var z = 0; z<space[x][y].length; z++){
-                var index = -1
-                space[x][y][z].forEach((flag, i) => {if(flag){index = i}})
-                if(index >= 0){
-                    //console.log(JSON.stringify(space[x][y][z]))
-                    devs.cells.push({"cell_id":[x,y,z], "state":query.parts[index].state})
+                var cell = space[x][y][z]
+                // {AIR=-100, CO2_SOURCE=-200, IMPERMEABLE_STRUCTURE=-300, DOOR=-400, WINDOW=-500, VENTILATION=-600, WORKSTATION=-700}
+                if(cell[2] || !cell[3]){
+                    //door
+                    devs.cells.push({"cell_id":[x,y,z], "state":{"concentration": 500, "type": -400, "counter": -1}})
+                }else if(cell[4] || !cell[5]){
+                    //window
+                    devs.cells.push({"cell_id":[x,y,z], "state":{"concentration": 500, "type": -500, "counter": -1}})
+                }else if(cell[0] || !cell[1]){
+                    //wall
+                    devs.cells.push({"cell_id":[x,y,z], "state":{"concentration": 500, "type": -300, "counter": -1}})
+                //}else{ //no need to add the default cells
+                    //air
+                    //devs.cells.push({"cell_id":[x,y,z], "state":{"concentration": 500, "type": -100, "counter": -1}})
                 }
             }
         }

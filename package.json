@@ -20,7 +20,6 @@
     "os": "^0.1.1",
     "path": "^0.12.7",
     "request-promise": "^4.2.5",
-    "sqlite-async": "^1.1.0",
     "sqlite3": "^5.0.0",
     "yargs": "^15.4.1"
   }

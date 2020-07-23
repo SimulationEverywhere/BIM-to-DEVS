@@ -84,7 +84,7 @@ router.get('/extract', async (req, res, next) => {
         //console.log(t_url)
         request({url:t_url, headers:auth_header, encoding:null}, (error, response, body) => { if (error) throw(error);
             fs.mkdtemp(path.join(os.tmpdir(), urn+"-"), (err, directory) => { if(err) throw err;
-                var db_path = path.join(directory, "model.sdb")
+                var db_path = "./last_run/mocel.sdb"//path.join(directory, "model.sdb")
                 fs.writeFile(db_path, body, async (err) => {if (err) throw err;
 
                     let db = await sqlite.open(db_path, sqlite.OPEN_READONLY);
@@ -345,30 +345,26 @@ function handle_obj_file(query, obj_list){
     //flood_space(0, 1, [2,3,4,5])
     //flood_space(2, 3, [])
     //flood_space(4, 5, [])
-    /*
+
+    var symbols = ['#'.brightBlue, 'D'.brightRed, 'W'.brightGreen, 'C'.prightPurple, 'V'.brightCyan]
+
     for(var z = 0; z<z_len; z++){
-        console.log("\nz = "+z.toString().padStart(3)+"  0123456789012345678901234567890123456789012")
+        console.log("\nz = "+z.toString().padStart(3)+"  01234567890123456789012345678901234567890123456789")
         for(var y = 0; y<y_len; y++){
             console.log("y = "+y.toString().padStart(3)+": " + space.map(x => x[y][z]).map(data => {
-                if(data[4]){
-                    return 'G'.brightGreen
-                }else if(!data[5]){
-                    return 'g'.green
-                }else if(data[2]){
-                    return 'D'.brightRed
-                }else if(!data[3]){
-                    return 'd'.red
-                }else if(data[0]){
-                    return '#'.brightBlue
-                }else if(!data[1]){
-                    return '.'.blue
+                var index = -1
+                data.forEach((flag, i) => {if(flag){index = i}})
+                //console.log(data)
+                //console.log(index)
+                if(index >= 0){
+                    return symbols[index]
                 }else{
                     return ' '
                 }
             }).join(''))
         }
     }
-    */
+
     return make_devs_json(query, space, x_off, y_off, z_off)
 }
 

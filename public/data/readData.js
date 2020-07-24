@@ -1,5 +1,6 @@
 d3.csv("/data/state_changing.csv", function(data) {
 	window.data = [];
+	window.legendOFF = true;
 	
 	window.max_x = d3.max(data, d => +d.x) + 1;
 	window.max_y = d3.max(data, d => +d.y) + 1;

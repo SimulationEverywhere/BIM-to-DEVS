@@ -1,4 +1,4 @@
-# RevitWebViewer
+# BIM-to-DEVS
 
 To run the app, clone the repo and npm install to get the dependencies
 

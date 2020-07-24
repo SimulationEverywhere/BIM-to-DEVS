@@ -21,12 +21,9 @@ window.onload = function() {
       // append multiple color stops by using D3's data/enter step
       linearGradient.selectAll("stop")
           .data([
-              {offset: "0%", color: "#E28672"},
-              {offset: "10%", color: "#EC93AB"},
-              {offset: "15%", color: "#CEB1DE"},
-              {offset: "20%", color: "#95D3F0"},
-              {offset: "25%", color: "#77EDD9"},
-              {offset: "100%", color: "#A9FCAA"}
+              {offset: "0%", color: "#0000FF"},
+              {offset: "36.36%", color: "#FFFFFF"},
+              {offset: "100%", color: "#FF0000"}
           ])
           .enter().append("stop")
           .attr("offset", function(d) { 
@@ -41,8 +38,8 @@ window.onload = function() {
           .attr("class", "legendTitle")
           .attr("x", 0)
           .attr("y", 20)
-          .style("text-anchor", "left")
-          .text("Legend title");
+          .style("text-anchor", "mid")
+          .text("CO2 Concentration (ppm)");
   
       // draw the rectangle and fill with gradient
       svgLegend.append("rect")
@@ -52,16 +49,20 @@ window.onload = function() {
           .attr("height", 15)
           .style("fill", "url(#linear-gradient)");
   
-      //create tick marks
-      var xLeg = d3.scaleLinear()
-          .domain([0, 100])
-          .range([0, 300]);
-  
-      var axisLeg = d3.axisBottom(xLeg);
-  
-      svgLegend
-          .attr("class", "axis")
-          .append("g")
-          .attr("transform", "translate(0, 40)")
-          .call(axisLeg);
+        //create tick marks
+        var xLeg = d3.scale.ordinal()
+        .domain([100,500,1200])
+        .range([0,100,290])
+
+        var axisLeg = d3.axisBottom(xLeg);
+
+        svgLegend
+            .attr("class", "axis")
+            .append("g")
+            .attr("transform", "translate(10, 40)")
+            .call(axisLeg);
+
   }
+
+
+

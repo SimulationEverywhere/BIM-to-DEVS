@@ -25,7 +25,7 @@ cellInfo = {
 }
 
 # File to be parsed
-filename = "text_model_layer.txt"
+filename = "data/text_model_layer.txt"
 
 # Import file
 stringData = ""

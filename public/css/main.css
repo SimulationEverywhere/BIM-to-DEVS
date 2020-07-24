@@ -62,6 +62,7 @@ body {
     border-radius: 2px;
     left:450px;
     user-select: none;
+    pointer-events: none
 }
 #legend svg {
     height: 70px;

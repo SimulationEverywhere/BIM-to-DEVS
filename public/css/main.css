@@ -60,8 +60,11 @@ body {
     padding: 10px;
     background: rgba(255,255,255,0);
     border-radius: 2px;
-    left:450px;
+    top: 7%;
+    left: 45%;
     user-select: none;
+    pointer-events: none;
+    transform: translate(-50%,-50%);
 }
 #legend svg {
     height: 70px;

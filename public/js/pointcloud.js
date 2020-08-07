@@ -6,8 +6,12 @@ class PointCloudExtension extends Autodesk.Viewing.Extension {
 		this._group = null;
         this._button = null;
 
+        // this.xaxisOffset = -0.52; // [office model]
+        // this.yaxisOffset = -0.52; // [office model]
+        this.xaxisOffset = 0; // [computer lab]
+        this.yaxisOffset = 0; // [computer lab]
         this.zaxisOffset = -1.5;
-        this.pointSize = 50;
+        this.pointSize = 25;
     }
 
     load() {
@@ -17,12 +21,13 @@ class PointCloudExtension extends Autodesk.Viewing.Extension {
     }
 
     _renderCloud(){
-        if(renderPointCloud){
+        // if(renderPointCloud){
             this.points = this._generatePointCloud();
-            this.points.scale.set(108,73, 5); //Match size with project size. (unit: inch)
+            // this.points.scale.set(108,73, 5); //Match size with project size. (unit: inch) [office model]
+            this.points.scale.set(38,57, 12); //Match size with project size. (unit: inch) [computer lab]
             this.viewer.impl.createOverlayScene('pointclouds');
             this.viewer.impl.addOverlay('pointclouds', this.points);
-        }
+        // }
     }
 
     unload() {
@@ -51,27 +56,20 @@ class PointCloudExtension extends Autodesk.Viewing.Extension {
      */
     _generatePointCloudGeometry() {
         let geometry = new THREE.BufferGeometry();
-        let numPoints = max_x * max_y;
+        let numPoints = unique.length;
 		let positions = new Float32Array(numPoints * 3);
         let colors = new Float32Array(numPoints * 3);
         let color = new THREE.Color();
 
-        for (var i = 0; i < changedata.length; i++){
-            var messages = changedata[i];
-            for (var j = 0; j < messages.length; j++) {
-                var m = messages[j];
-
-                let k = m.x * max_y + m.y;
-                let u = m.x / max_x - 0.52;
-                let v = m.y / max_y - 0.52;
-
-                positions[3 * k] = u;
-                positions[3 * k + 1] = v;
-                positions[3 * k + 2] = this.zaxisOffset;
-
-                color.setRGB(255/255, 255/255, 255/255);
-                color.toArray(colors, k * 3);
-            }
+        for(var i = 0; i<unique.length; i++){
+            let u = unique[i].x / max_x + this.xaxisOffset;
+            let v = unique[i].y / max_y + this.yaxisOffset;
+            let w = unique[i].z / max_z + this.zaxisOffset;
+            positions[3 * i] = u;
+            positions[3 * i + 1] = v;
+            positions[3 * i + 2] = w;
+            color.setRGB(255/255, 255/255, 255/255);
+            color.toArray(colors, i * 3);
         }
 
 		geometry.addAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -93,22 +91,22 @@ class PointCloudExtension extends Autodesk.Viewing.Extension {
             gl_PointSize = size * ( size / (length(mvPosition.xyz) + 0.00001) );
             gl_Position = projectionMatrix * mvPosition;
         }`
-        // var fShader = `varying vec3 vColor;
-        // void main() {
-        //     gl_FragColor = vec4( vColor, 1.0 );
-        // }`
-
         var fShader = `varying vec3 vColor;
-        uniform sampler2D sprite;
         void main() {
-            gl_FragColor = vec4(vColor, 1.0 ) * texture2D( sprite, gl_PointCoord );
-            if (gl_FragColor.x < 0.2) discard;
+            gl_FragColor = vec4( vColor, 1.0 );
         }`
+
+        // var fShader = `varying vec3 vColor;
+        // uniform sampler2D sprite;
+        // void main() {
+        //     gl_FragColor = vec4(vColor, 1.0 ) * texture2D( sprite, gl_PointCoord );
+        //     if (gl_FragColor.x < 0.2) discard;
+        // }`
 
         var material = new THREE.ShaderMaterial( {
             uniforms: {
                 size: { type: 'f', value: this.pointSize},
-                sprite: { type: 't', value: THREE.ImageUtils.loadTexture("./particle.png") },
+                // sprite: { type: 't', value: THREE.ImageUtils.loadTexture("./particle.png") },
             },
             vertexShader: vShader,
             fragmentShader: fShader,
@@ -160,7 +158,7 @@ class PointCloudExtension extends Autodesk.Viewing.Extension {
             var color1 = {r:0,g:0,b:255};
             var color2 = {r:255,g:255,b:255};
             var color3 = {r:255,g:0,b:0};
-            var colorRange = {min:100, mid:500, max:1200}
+            var colorRange = {min:310, mid:500, max:690}
             let r;
             let g;
             let b;
@@ -189,13 +187,7 @@ class PointCloudExtension extends Autodesk.Viewing.Extension {
                 b = color3.b;
             }
 
-            let k = m.x * max_y + m.y;
-            //this.points.geometry.attributes.position.array[3 * k + 2] = (1/3) * w + this.zaxisOffset;
-            
-            // //Select color
-            // let r = (w>0)?1:1+w;                 //r=1 when 0<w<1
-            // let g = (w>0)?1-w:1+w;   //g=1 when w==1
-            // let b = (w>0)?1-w:1;       //b=1 when -1<w<0
+            let k = unique.findIndex(obj => obj.x === m.x && obj.y === m.y && obj.z === m.z);
 
             let color = new THREE.Color();
             color.setRGB(r/255,g/255,b/255);
@@ -203,7 +195,6 @@ class PointCloudExtension extends Autodesk.Viewing.Extension {
             colors[3 * k + 1] = color.g;   // g=1 when w==1
             colors[3 * k + 2] = color.b;   // b=1 when -1<w<0
         }
-        //this.points.geometry.attributes.position.needsUpdate=true;
         this.points.geometry.attributes.color.needsUpdate=true;
         this.viewer.impl.invalidate(true,false,true);
     }

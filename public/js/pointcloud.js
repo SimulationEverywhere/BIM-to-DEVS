@@ -11,7 +11,7 @@ class PointCloudExtension extends Autodesk.Viewing.Extension {
         this.xaxisOffset = 0; // [computer lab]
         this.yaxisOffset = 0; // [computer lab]
         this.zaxisOffset = -1.5;
-        this.pointSize = 25;
+        this.pointSize = 38;
     }
 
     load() {
@@ -91,22 +91,22 @@ class PointCloudExtension extends Autodesk.Viewing.Extension {
             gl_PointSize = size * ( size / (length(mvPosition.xyz) + 0.00001) );
             gl_Position = projectionMatrix * mvPosition;
         }`
-        var fShader = `varying vec3 vColor;
-        void main() {
-            gl_FragColor = vec4( vColor, 1.0 );
-        }`
-
         // var fShader = `varying vec3 vColor;
-        // uniform sampler2D sprite;
         // void main() {
-        //     gl_FragColor = vec4(vColor, 1.0 ) * texture2D( sprite, gl_PointCoord );
-        //     if (gl_FragColor.x < 0.2) discard;
+        //     gl_FragColor = vec4( vColor, 0.6 );
         // }`
+
+        var fShader = `varying vec3 vColor;
+        uniform sampler2D sprite;
+        void main() {
+            gl_FragColor = vec4(vColor, 0.5 ) * texture2D( sprite, gl_PointCoord );
+            if (gl_FragColor.x < 0.2) discard;
+        }`
 
         var material = new THREE.ShaderMaterial( {
             uniforms: {
                 size: { type: 'f', value: this.pointSize},
-                // sprite: { type: 't', value: THREE.ImageUtils.loadTexture("./particle.png") },
+                sprite: { type: 't', value: THREE.ImageUtils.loadTexture("./white.png") },
             },
             vertexShader: vShader,
             fragmentShader: fShader,
@@ -158,7 +158,7 @@ class PointCloudExtension extends Autodesk.Viewing.Extension {
             var color1 = {r:0,g:0,b:255};
             var color2 = {r:255,g:255,b:255};
             var color3 = {r:255,g:0,b:0};
-            var colorRange = {min:310, mid:500, max:690}
+            var colorRange = {min:100, mid:500, max:690};
             let r;
             let g;
             let b;
@@ -223,7 +223,7 @@ class PointCloudExtension extends Autodesk.Viewing.Extension {
             linearGradient.selectAll("stop")
                 .data([
                     {offset: "0%", color: "#0000FF"},
-                    {offset: "36.36%", color: "#FFFFBE"},
+                    {offset: "67.80%", color: "#FFFFFF"},
                     {offset: "100%", color: "#FF0000"}
                 ])
                 .enter().append("stop")
@@ -252,8 +252,8 @@ class PointCloudExtension extends Autodesk.Viewing.Extension {
         
                 //create tick marks
                 var xLeg = d3.scale.ordinal()
-                .domain([100,500,1200])
-                .range([0,100,290])
+                .domain([100,500,690])
+                .range([0,185,290])
 
                 var axisLeg = d3.axisBottom(xLeg);
 

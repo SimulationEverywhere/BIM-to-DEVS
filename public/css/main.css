@@ -1,78 +1,30 @@
-html,
-body {
+html, body {
     min-height: 100%;
     height: 100%;
-}
-.fill {
+  }
+  
+  .fill {
     height: calc(100vh - 100px);
-}
-body {
-    padding-top: 60px;
-    /* space for the top nav bar */
+  }
+  
+  body {
+    padding-top: 60px; /* space for the top nav bar */
     margin-right: 30px;
-}
-#userHubs {
+  }
+  
+  #appBuckets {
     overflow: auto;
     width: 100%;
     height: calc(100vh - 150px);
-}
-#forgeViewer {
+  }
+  
+  #forgeViewer {
     width: 100%;
-}
-.co2CadmiumExtensionIcon {
-    background-image: url(/img/co2.png);
-    background-size: 24px;
-    background-repeat: no-repeat;
-    background-position: center;
-}
-.epidemicsExtensionIcon {
-    background-image: url(/img/epidemics.png);
-    background-size: 24px;
-    background-repeat: no-repeat;
-    background-position: center;
-}
-.pointcloudIcon {
-    background-image: url(/img/Playbutton.png);
-    background-size: 24px;
-    background-repeat: no-repeat;
-    background-position: center;
-}
-.legendTitle {
-    font-size: 15px;
-    fill: #4F4F4F;
-    font-weight: 12;
-}
-.axis path, .axis line {
-    fill: none;
-    stroke: none; /*black;*/
-    shape-rendering: crispEdges;
-}
-.axis text {
-    font-family: Consolas, courier;
-    fill: #000;
-    font-size: 9pt;
-}
-#legend {
-    z-index: 10000;
-    position: absolute;
-    margin-left: 15px;
-    margin-top: 5px;
-    padding: 10px;
-    background: rgba(255,255,255,0);
-    border-radius: 2px;
-    top: 7%;
-    left: 45%;
-    user-select: none;
-    pointer-events: none;
-    transform: translate(-50%,-50%);
-}
-#legend svg {
-    height: 70px;
-}
-#legend svg .tick:first-child {
-    text-anchor:start;
-}
+  }
 
-#legend svg .tick:last-child {
-    text-anchor:end;
+  .DataExtractExtensionIcon {
+    background-image: url(/img/dataextraction.png);
+    background-size: 24px;
+    background-repeat: no-repeat;
+    background-position: center;
 }

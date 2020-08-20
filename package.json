@@ -1,27 +1,17 @@
 {
-  "name": "bim",
+  "name": "firsttry",
   "version": "1.0.0",
-  "description": "",
+  "description": "First try at forge",
   "main": "start.js",
   "scripts": {
-    "start": "node start.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "Saif Rahman",
+  "author": "Vinu",
   "license": "ISC",
   "dependencies": {
-    "colors": "^1.4.0",
     "cookie-session": "^1.4.0",
     "express": "^4.17.1",
     "forge-apis": "^0.7.3",
-    "forge-convert-utils": "^3.5.0",
-    "multer": "^1.4.2",
-    "obj-file-parser": "^0.5.0",
-    "os": "^0.1.1",
-    "path": "^0.12.7",
-    "request-promise": "^4.2.5",
-    "sqlite-async": "^1.1.0",
-    "sqlite3": "^5.0.0",
-    "yargs": "^15.4.1"
+    "multer": "^1.4.2"
   }
 }

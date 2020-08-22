@@ -35,17 +35,8 @@ class DataExtractExtension extends Autodesk.Viewing.Extension {
         this._button.onClick = (ev) => {
             // Execute an action here
             alert("Data Extracted");
-            // Check if the panel is created or not
-            if (this._panel == null) {
-                this._panel = new ModelSummaryPanel(this.viewer, this.viewer.container, 'modelSummaryPanel', 'Model Summary');
-            }
-            // Show/hide docking panel
-            this._panel.setVisible(!this._panel.isVisible());
-
-            // If panel is NOT visible, exit the function
-            if (!this._panel.isVisible())
-                return;
-
+            var thisRef = this;
+            var data = [];
             // First, the viewer contains all elements on the model, including
             // categories (e.g. families or part definition), so we need to enumerate
             // the leaf nodes, meaning actual instances of the model. The following
@@ -54,32 +45,20 @@ class DataExtractExtension extends Autodesk.Viewing.Extension {
                 // Now for leaf components, let's get some properties and count occurrences of each value
                 const filteredProps = ['Category'];
                 // Get only the properties we need for the leaf dbIds
-                this.viewer.model.getBulkProperties(dbIds, filteredProps, (items) => {
+                this.viewer.model.getBulkProperties(dbIds, filteredProps, (elements) => {
                     // Iterate through the elements we found
-                    items.forEach((item) => {
-                        // and iterate through each property
-                        item.properties.forEach(function (prop) {
-                            // Use the filteredProps to store the count as a subarray
-                            if (filteredProps[prop.displayName] === undefined)
-                                filteredProps[prop.displayName] = {};
-                            // Start counting: if first time finding it, set as 1, else +1
-                            if (filteredProps[prop.displayName][prop.displayValue] === undefined)
-                                filteredProps[prop.displayName][prop.displayValue] = 1;
-                            else
-                                filteredProps[prop.displayName][prop.displayValue] += 1;
-                        });
-                    });
-                    // Now ready to show!
-                    // The PropertyPanel has the .addProperty that receives the name, value
-                    // and category, that simple! So just iterate through the list and add them
-                    filteredProps.forEach((prop) => {
-                        if (filteredProps[prop] === undefined) return;
-                        Object.keys(filteredProps[prop]).forEach((val) => {
-                            this._panel.addProperty(val, filteredProps[prop][val], prop);
-                        });
-                    });
+                   
+                    for(var i=0; i<elements.length; i++){
+                        var category = elements[i].properties[0].displayValue;
+                        if(category == "Revit Walls" || category == "Revit Windows" || category == "Revit Doors") {
+                                var bbox = thisRef.getBoundingBox(elements[i].dbId);
+                                var objType = category.substring(6, category.length-1);
+                                data.push({"id": elements[i].dbId, "type": objType, "bbox": bbox});
+                        }
+                    }
                 });
             });
+            console.log("Data extracted : ",data);
 
         };
         this._button.setToolTip('My Awesome Extension');
@@ -98,15 +77,18 @@ class DataExtractExtension extends Autodesk.Viewing.Extension {
             callback(leaves);
         });
     }
+
+    getBoundingBox(id) {
+        var f = new Float32Array(6);
+        var us = this.viewer.model.getUnitScale();
+        this.viewer.model.getInstanceTree().getNodeBox(id, f);
+        var bbox = f.map((e) => {return e*us});
+        bbox = Array.prototype.slice.call(bbox);
+        return bbox;
+    }
     
 }
 
-class ModelSummaryPanel extends Autodesk.Viewing.UI.PropertyPanel {
-    constructor(viewer, container, id, title, options) {
-        super(container, id, title, options);
-        this.viewer = viewer;
-    }
-}
 
 
 Autodesk.Viewing.theExtensionManager.registerExtension('DataExtractExtension', DataExtractExtension);

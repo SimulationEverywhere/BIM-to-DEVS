@@ -1,4 +1,6 @@
+
 class DataExtractExtension extends Autodesk.Viewing.Extension {
+    
     constructor(viewer, options) {
         super(viewer, options);
         this._group = null;
@@ -6,7 +8,7 @@ class DataExtractExtension extends Autodesk.Viewing.Extension {
     }
 
     load() {
-        console.log('DataExtractExtensions has been loaded');
+        console.log('DataExtractExtension has been loaded');
         return true;
     }
 
@@ -18,45 +20,82 @@ class DataExtractExtension extends Autodesk.Viewing.Extension {
                 this.viewer.toolbar.removeControl(this._group);
             }
         }
-        console.log('DataExtractExtensions has been unloaded');
+        console.log('DataExtractExtension has been unloaded');
         return true;
     }
 
     onToolbarCreated() {
         // Create a new toolbar group if it doesn't exist
-        this._group = this.viewer.toolbar.getControl('allDataExtractExtensionsToolbar');
+        this._group = this.viewer.toolbar.getControl('allDataExtractExtensionToolbar');
         if (!this._group) {
-            this._group = new Autodesk.Viewing.UI.ControlGroup('allDataExtractExtensionsToolbar');
+            this._group = new Autodesk.Viewing.UI.ControlGroup('allDataExtractExtensionToolbar');
             this.viewer.toolbar.addControl(this._group);
         }
 
-        // Add a new button to the toolbar group
-        this._button = new Autodesk.Viewing.UI.Button('DataExtractExtensionButton');
+        // Button for exporting CO2 JSON configuration files
+        this._button = new Autodesk.Viewing.UI.Button('co2DataExtractExtensionButton');
+        this._button.onClick = (ev) => {
+            //alert("Not implemented yet! It has to export the model information to a Cadmium JSON file (CO2 model).");
+            
+            // Some basic functionalities to practice:
+            //this.showNumWallsFromSelection();
+            //this.showOverallNumWalls();
+
+            // Download JSON with the bboxes of some interest objects (walls for now)
+            // If something is selected, the extraction will be done with the selection
+            // Else, the extraction is done with the entire model
+            const selection = this.viewer.getSelection();
+            //this.viewer.clearSelection();
+            if (selection.length > 0) {
+                this.extractWallsDictFromSelection();
+            } else {
+                this.extractAllWallsDict();
+            }
+        };
+        this._button.setToolTip('Export JSON for CO2 model');
+        this._button.addClass('co2DataExtractExtensionIcon');
+        this._group.addControl(this._button);
+
+        // Button for exporting Epidemic JSON configuration files
+        this._button = new Autodesk.Viewing.UI.Button('epidemicsDataExtractExtensionButton');
         this._button.onClick = (ev) => {
             // Execute an action here
-            alert("Data Extracted");
-            var thisRef = this;
-            var data = [];
-            // First, the viewer contains all elements on the model, including
-            // categories (e.g. families or part definition), so we need to enumerate
-            // the leaf nodes, meaning actual instances of the model. The following
-            // getAllLeafComponents function is defined at the bottom
-            this.getAllLeafComponents((dbIds) => {
-                // Now for leaf components, let's get some properties and count occurrences of each value
-                const filteredProps = ['Category'];
-                // Get only the properties we need for the leaf dbIds
-                this.viewer.model.getBulkProperties(dbIds, filteredProps, (elements) => {
-                    // Iterate through the elements we found
-                   
-                    for(var i=0; i<elements.length; i++){
-                        var category = elements[i].properties[0].displayValue;
-                        console.log(category);
-                        if(category == "Revit Walls" || category == "Revit Windows" || category == "Revit Doors") {
-                                var bbox = thisRef.getBoundingBox(elements[i].dbId);
-                                var objType = category.substring(6, category.length-1);
-                                data.push({"id": elements[i].dbId, "type": objType, "bbox": bbox});
-                        }
+            //alert("Not implemented yet! It has to export the model information to a Cadmium JSON file (Epidemic model).");
+            var canv = document.createElement('canvas');
+            canv.id = 'canvasAux';
+            canv.width = 200;
+            canv.height = 200;
+            document.body.appendChild(canv); // adds the canvas to the body element
+
+            //var canvRef = document.getElementById('canvasAux');
+            var context = canv.getContext('2d');
+            context.fillStyle = "#FF0000";
+            context.fillRect(0, 0, 50, 50);
+            context.fillStyle = "#00FF00";
+            context.fillRect(55, 0, 50, 50);
+            context.fillStyle = "#0000FF";
+            context.fillRect(110, 0, 50, 50);
+            context.scale(4, 4);
+            
+        };
+        this._button.setToolTip('Export JSON for Epidemic model');
+        this._button.addClass('epidemicsExtensionIcon');
+        this._group.addControl(this._button);
+    }
+
+    extractObjDict(ids) {
+        var thisRef = this;
+        viewer.model.getBulkProperties(ids, ['Category'],
+            function(elements){
+                var data = [];
+                for(var i=0; i<elements.length; i++){
+                    var category = elements[i].properties[0].displayValue;
+                    if(category == "Revit Walls" || category == "Revit Windows" || category == "Revit Doors") {
+                            var bbox = thisRef.getBoundingBox(elements[i].dbId);
+                            var objType = category.substring(6, category.length-1);
+                            data.push({"id": elements[i].dbId, "type": objType, "bbox": bbox});
                     }
+                }
                 DataExtractExtension.formatObjDict(data);  // remove negative values
                 var dataStr = JSON.stringify(data).replace(/\"([^(\")"]+)\":/g,"$1:");
                 alert(dataStr);
@@ -64,27 +103,41 @@ class DataExtractExtension extends Autodesk.Viewing.Extension {
                 alert(scenarioDims);
                 DataExtractExtension.drawCanvas(data);
                 DataExtractExtension.download(dataStr, "config.json", "application/json");
-                });
-            });
-            console.log("Data extracted : ",data);
-
-        };
-        this._button.setToolTip('My Awesome Extension');
-        this._button.addClass('DataExtractExtensionIcon');
-        this._group.addControl(this._button);
+            }
+        );
     }
 
-    getAllLeafComponents(callback) {
-        this.viewer.getObjectTree(function (tree) {
-            let leaves = [];
-            tree.enumNodeChildren(tree.getRootId(), function (dbId) {
-                if (tree.getChildCount(dbId) === 0) {
-                    leaves.push(dbId);
-                }
-            }, true);
-            callback(leaves);
-        });
+    extractAllWallsDict() {
+        var ids = viewer.model.getData().instanceTree.nodeAccess.dbIdToIndex;
+        this.extractObjDict(ids);
     }
+
+    extractWallsDictFromSelection() {
+        const selection = this.viewer.getSelection();
+        this.extractObjDict(selection);
+    }
+
+    static download(data, filename, type) {
+        var file = new Blob([data], {type: type});
+        if (window.navigator.msSaveOrOpenBlob) // IE10+
+            window.navigator.msSaveOrOpenBlob(file, filename);
+        else { // Others
+            var a = document.createElement("a"),
+                    url = URL.createObjectURL(file);
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(function() {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);  
+            }, 0); 
+        }
+    }
+
+    // ----------------------------------------
+    // UTILS
+    // ----------------------------------------
 
     getBoundingBox(id) {
         var f = new Float32Array(6);
@@ -93,6 +146,27 @@ class DataExtractExtension extends Autodesk.Viewing.Extension {
         var bbox = f.map((e) => {return e*us});
         bbox = Array.prototype.slice.call(bbox);
         return bbox;
+    }
+
+    static getDimFromObjDict(elems) {
+        if(elems.length == 0) return;
+        var minX = elems[0]["bbox"][0], 
+            minY = elems[0]["bbox"][1], 
+            minZ = elems[0]["bbox"][2], 
+            maxX = elems[0]["bbox"][3], 
+            maxY = elems[0]["bbox"][4], 
+            maxZ = elems[0]["bbox"][5];
+
+        for(var i=1; i<elems.length; i++){
+            if(elems[i]["bbox"][0]<minX) minX = elems[i]["bbox"][0];
+            if(elems[i]["bbox"][1]<minY) minY = elems[i]["bbox"][1];
+            if(elems[i]["bbox"][2]<minZ) minZ = elems[i]["bbox"][2];
+            if(elems[i]["bbox"][3]>maxX) maxX = elems[i]["bbox"][3];
+            if(elems[i]["bbox"][4]>maxY) maxY = elems[i]["bbox"][4];
+            if(elems[i]["bbox"][5]>maxZ) maxZ = elems[i]["bbox"][5];
+        }
+
+        return [minX, minY, minZ, maxX, maxY, maxZ];
     }
 
     // Convert the bboxes coordinates to non-negative ones if needed
@@ -110,25 +184,34 @@ class DataExtractExtension extends Autodesk.Viewing.Extension {
         return elems;
     }
 
-    static getDimFromObjDict(elems) {
-        if(elems.length == 0) return;
-        var minX = elems[0]["bbox"][0],
-            minY = elems[0]["bbox"][1],
-            minZ = elems[0]["bbox"][2],
-            maxX = elems[0]["bbox"][3],
-            maxY = elems[0]["bbox"][4],
-            maxZ = elems[0]["bbox"][5];
+    static drawItem(context, elem, ratio) {
+        var srcX = elem["bbox"][0]*ratio;
+        var srcY = elem["bbox"][1]*ratio;
+        var dstX = elem["bbox"][3]*ratio;
+        var dstY = elem["bbox"][4]*ratio;
 
-        for(var i=1; i<elems.length; i++){
-            if(elems[i]["bbox"][0]<minX) minX = elems[i]["bbox"][0];
-            if(elems[i]["bbox"][1]<minY) minY = elems[i]["bbox"][1];
-            if(elems[i]["bbox"][2]<minZ) minZ = elems[i]["bbox"][2];
-            if(elems[i]["bbox"][3]>maxX) maxX = elems[i]["bbox"][3];
-            if(elems[i]["bbox"][4]>maxY) maxY = elems[i]["bbox"][4];
-            if(elems[i]["bbox"][5]>maxZ) maxZ = elems[i]["bbox"][5];
+        if(elem["type"] == "Wall") {
+            context.strokeStyle = "#000000";
+        } else if(elem["type"] == "Window") {
+            context.strokeStyle = "#FF0000";
+        } else if(elem["type"] == "Door") {
+            context.strokeStyle = "#00FF00";
         }
-
-        return [minX, minY, minZ, maxX, maxY, maxZ];
+        
+        if(dstX-srcX < dstY-srcY) {
+            context.lineWidth = dstX-srcX;
+            srcX += context.lineWidth/2;
+            dstX -= context.lineWidth/2;
+        } else {
+            context.lineWidth = dstY-srcY;
+            srcY += context.lineWidth/2;
+            dstY -= context.lineWidth/2;
+        }
+        context.beginPath();
+        context.moveTo(srcX, srcY);
+        context.lineTo(dstX, dstY);
+        context.stroke();
+        context.closePath();
     }
 
     static drawCanvas(elems) {
@@ -156,54 +239,6 @@ class DataExtractExtension extends Autodesk.Viewing.Extension {
         //canv.style.height = (dims[4]*1000/prec) + 'px';
     }
 
-    static download(data, filename, type) {
-        var file = new Blob([data], {type: type});
-        if (window.navigator.msSaveOrOpenBlob) // IE10+
-            window.navigator.msSaveOrOpenBlob(file, filename);
-        else { // Others
-            var a = document.createElement("a"),
-                    url = URL.createObjectURL(file);
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            setTimeout(function() {
-                document.body.removeChild(a);
-                window.URL.revokeObjectURL(url);
-            }, 0);
-        }
-    }
-
-    static drawItem(context, elem, ratio) {
-        var srcX = elem["bbox"][0]*ratio;
-        var srcY = elem["bbox"][1]*ratio;
-        var dstX = elem["bbox"][3]*ratio;
-        var dstY = elem["bbox"][4]*ratio;
-
-        if(elem["type"] == "Wall") {
-            context.strokeStyle = "#000000";
-        } else if(elem["type"] == "Window") {
-            context.strokeStyle = "#FF0000";
-        } else if(elem["type"] == "Door") {
-            context.strokeStyle = "#00FF00";
-        }
-
-        if(dstX-srcX < dstY-srcY) {
-            context.lineWidth = dstX-srcX;
-            srcX += context.lineWidth/2;
-            dstX -= context.lineWidth/2;
-        } else {
-            context.lineWidth = dstY-srcY;
-            srcY += context.lineWidth/2;
-            dstY -= context.lineWidth/2;
-        }
-        context.beginPath();
-        context.moveTo(srcX, srcY);
-        context.lineTo(dstX, dstY);
-        context.stroke();
-        context.closePath();
-    }
-    
 }
 
 Autodesk.Viewing.theExtensionManager.registerExtension('DataExtractExtension', DataExtractExtension);

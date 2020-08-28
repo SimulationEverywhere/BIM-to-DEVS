@@ -91,7 +91,7 @@ class DataExtractExtension extends Autodesk.Viewing.Extension {
 
     static drawcanvas(dataID) {
         //ray-shooter bounding box method
-         var cellSize  = 0.40;
+         var cellSize  = 0.25;
          const bounds = viewer.model.getBoundingBox();
          const width = Math.floor((bounds.max.x - bounds.min.x) / cellSize);
          const height = Math.floor((bounds.max.y - bounds.min.y) / cellSize);  
@@ -112,12 +112,12 @@ class DataExtractExtension extends Autodesk.Viewing.Extension {
                      data.data[i + 1] = 255;
                      data.data[i + 2] = 0;
                      data.data[i + 3] = 255;
-                 } else {
-                    data.data[i] = 0;
-                    data.data[i + 1] = 0;
-                    data.data[i + 2] = 0;
-                    data.data[i + 3] = 255;
-                }
+                  } //else {
+                //     data.data[i] = 0;
+                //     data.data[i + 1] = 0;
+                //     data.data[i + 2] = 0;
+                //     data.data[i + 3] = 255;
+                // }
                  i += 4;
              }
          }

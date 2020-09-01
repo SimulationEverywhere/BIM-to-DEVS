@@ -59,6 +59,7 @@ class PointCloudExtension extends Autodesk.Viewing.Extension {
         let numPoints = unique.length;
 		let positions = new Float32Array(numPoints * 3);
         let colors = new Float32Array(numPoints * 3);
+        let sizes = new Float32Array(numPoints * 2);
         let color = new THREE.Color();
 
         for(var i = 0; i<unique.length; i++){
@@ -70,10 +71,12 @@ class PointCloudExtension extends Autodesk.Viewing.Extension {
             positions[3 * i + 2] = w;
             color.setRGB(255/255, 255/255, 255/255);
             color.toArray(colors, i * 3);
+            sizes[2 * i] = this.pointSize;
         }
 
 		geometry.addAttribute('position', new THREE.BufferAttribute(positions, 3));
         geometry.addAttribute('color', new THREE.BufferAttribute(colors, 3));
+        geometry.addAttribute('uv', new THREE.BufferAttribute(sizes, 2));
         geometry.computeBoundingBox();
         geometry.isPoints = true; // This flag will force Forge Viewer to render the geometry as gl.POINTS
         
@@ -88,7 +91,7 @@ class PointCloudExtension extends Autodesk.Viewing.Extension {
         void main() {
             vColor = color;
             vec4 mvPosition = modelViewMatrix * vec4( position, 1.0 );
-            gl_PointSize = size * ( size / (length(mvPosition.xyz) + 0.00001) );
+            gl_PointSize =  uv.x * ( uv.x / (length(mvPosition.xyz) + 0.00001));
             gl_Position = projectionMatrix * mvPosition;
         }`
         // var fShader = `varying vec3 vColor;
@@ -99,14 +102,13 @@ class PointCloudExtension extends Autodesk.Viewing.Extension {
         var fShader = `varying vec3 vColor;
         uniform sampler2D sprite;
         void main() {
-            gl_FragColor = vec4(vColor, 0.5 ) * texture2D( sprite, gl_PointCoord );
+            gl_FragColor = vec4(vColor, 0.3 ) * texture2D( sprite, gl_PointCoord );
             if (gl_FragColor.x < 0.2) discard;
         }`
 
         var material = new THREE.ShaderMaterial( {
             uniforms: {
-                size: { type: 'f', value: this.pointSize},
-                sprite: { type: 't', value: THREE.ImageUtils.loadTexture("./white.png") },
+                sprite: { type: 't', value: THREE.ImageUtils.loadTexture("./yellow.png") },
             },
             vertexShader: vShader,
             fragmentShader: fShader,
@@ -151,6 +153,7 @@ class PointCloudExtension extends Autodesk.Viewing.Extension {
 
     _updatePointCloudGeometry(messages) {
         var colors = this.points.geometry.attributes.color.array;
+        var sizes = this.points.geometry.attributes.uv.array;
         let percent = 0;
 
         for (var i = 0; i < messages.length; i++) {
@@ -158,33 +161,39 @@ class PointCloudExtension extends Autodesk.Viewing.Extension {
             var color1 = {r:0,g:0,b:255};
             var color2 = {r:255,g:255,b:255};
             var color3 = {r:255,g:0,b:0};
-            var colorRange = {min:100, mid:500, max:690};
+            var colorRange = {min:250, mid:500, max:690};
             let r;
             let g;
             let b;
+            let sizePercent;
 
             if(m.state <= colorRange.min){
                 r = color1.r;
                 g = color1.g;
                 b = color1.b;
+                sizePercent = 0.9;
             }else if(m.state > colorRange.min && m.state < colorRange.mid){
                 percent = (m.state - colorRange.min) / (colorRange.mid - colorRange.min);
                 r = color1.r + percent * (color2.r - color1.r);
                 g = color1.g + percent * (color2.g - color1.g);
                 b = color1.b + percent * (color2.b - color1.b);
+                sizePercent = 1 - percent*0.1;
             }else if(m.state == colorRange.mid){
                 r = color2.r;
                 g = color2.g;
                 b = color2.b;
+                sizePercent = 1;
             }else if(m.state > colorRange.mid && m.state < colorRange.max){
                 percent = (m.state - colorRange.mid) / (colorRange.max - colorRange.mid);
                 r = color2.r + percent * (color3.r - color2.r);
                 g = color2.g + percent * (color3.g - color2.g);
                 b = color2.b + percent * (color3.b - color2.b);
+                sizePercent = 1 + percent*0.5;
             }else{
                 r = color3.r;
                 g = color3.g;
                 b = color3.b;
+                sizePercent = 1.5;
             }
 
             let k = unique.findIndex(obj => obj.x === m.x && obj.y === m.y && obj.z === m.z);
@@ -194,8 +203,10 @@ class PointCloudExtension extends Autodesk.Viewing.Extension {
             colors[3 * k] = color.r;       // r=1 when 0<w<1
             colors[3 * k + 1] = color.g;   // g=1 when w==1
             colors[3 * k + 2] = color.b;   // b=1 when -1<w<0
+            sizes[2 * k] = this.pointSize * sizePercent;
         }
         this.points.geometry.attributes.color.needsUpdate=true;
+        this.points.geometry.attributes.uv.needsUpdate=true;
         this.viewer.impl.invalidate(true,false,true);
     }
 

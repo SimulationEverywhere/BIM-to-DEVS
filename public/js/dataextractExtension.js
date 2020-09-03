@@ -37,7 +37,7 @@ class DataExtractExtension extends Autodesk.Viewing.Extension {
         this._button.onClick = (ev) => {
 
         // //single object detection
-        // const selection = this.viewer.getSelection();
+        const selection = this.viewer.getSelection();
         // this.extractObjDict(selection);
 
         //getting the id's of the material
@@ -64,34 +64,23 @@ class DataExtractExtension extends Autodesk.Viewing.Extension {
                 var datas = [];
                 for(var d=0; d<elements.length; d++){
                     var category = elements[d].properties[0].displayValue;
-                    if(category == "Revit Walls" || category == "Revit Windows" || category == "Revit Doors" || category == "Revit Furniture Systems" || category == "Revit Mechanical Equipment") {
+                    if(category == "Revit Walls" || category == "Revit Windows" || category == "Revit Doors" || category == "Revit Furniture Systems" || category == "Revit Mechanical Equipment") { 
                              dataID.push(elements[d].dbId);
-                             
-                            //  var bbox = thisRef.getBoundingBox(elements[d].dbId);
-                            //  var objType = category.substring(6, category.length-1);
-                            //  datas.push({"id": elements[d].dbId, "type": objType, "bbox": bbox});
+                             var objType = category.substring(6, category.length-1);
+                             datas.push({"id": elements[d].dbId, "type": objType});
                     }
                 }
                 //DataExtractExtension.formatObjDict(data);  // remove negative values
                 //var dataStr = JSON.stringify(data).replace(/\"([^(\")"]+)\":/g,"$1:");
-                DataExtractExtension.drawcanvas(dataID);
+                DataExtractExtension.drawcanvas(dataID,datas);
                 //DataExtractExtension.download(dataStr, "config.json", "application/json");
             }
         );
     }   
 
-    // getBoundingBox(id) {
-    //     var f = new Float32Array(6);
-    //     var us = this.viewer.model.getUnitScale();
-    //     this.viewer.model.getInstanceTree().getNodeBox(id, f);
-    //     var bbox = f.map((e) => {return e*us});
-    //     bbox = Array.prototype.slice.call(bbox);
-    //     return bbox;
-    // }
-
-    static drawcanvas(dataID) {
+    static drawcanvas(dataID,datas) {
         //ray-shooter bounding box method
-         var cellSize  = 0.25;
+         var cellSize  = 0.2;
          const bounds = viewer.model.getBoundingBox();
          const width = Math.floor((bounds.max.x - bounds.min.x) / cellSize);
          const height = Math.floor((bounds.max.y - bounds.min.y) / cellSize);  
@@ -100,28 +89,37 @@ class DataExtractExtension extends Autodesk.Viewing.Extension {
          canvas.setAttribute('height', height + 'px');
          const context = canvas.getContext('2d');
          const data = context.getImageData(0, 0, width, height);
-         let ray = new THREE.Ray(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -1));
+         let ray = new THREE.Ray(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0.1, 0.1, -1));
          let i = 0;
+         var intersectionData = [];
          for (let j = 0; j < height; j++) {
              for (let k = 0; k < width; k++) {
                  ray.origin.x = bounds.min.x + k * cellSize;
                  ray.origin.y = bounds.min.y + j * cellSize;
-                 const intersection = viewer.impl.rayIntersect(ray, false,dataID);
-                 if (intersection) {
+                 const intersection = viewer.impl.rayIntersect(ray, false, dataID);
+                
+                  if (intersection){
+                      for(let g = 0; g < datas.length; g++){
+                        if(intersection.dbId == datas[g].id){
+                            intersectionData.push({'dbID': intersection.dbId, "type":datas[g].type, "vector":intersection.intersectPoint});
+                        }
+                      }
                      data.data[i] = 0;
-                     data.data[i + 1] = 255;
-                     data.data[i + 2] = 0;
+                     data.data[i + 1] = 0;
+                     data.data[i + 2] = 255;
                      data.data[i + 3] = 255;
                   }
-                   else {
-                    data.data[i] = 0;
-                    data.data[i + 1] = 0;
-                    data.data[i + 2] = 0;
-                    data.data[i + 3] = 255;
-                }
+                
+                //    else {
+                //     data.data[i] = 0;
+                //     data.data[i + 1] = 0;
+                //     data.data[i + 2] = 0;
+                //     data.data[i + 3] = 255;
+                // }
                  i += 4;
              }
          }
+         console.log(intersectionData);
          context.putImageData(data, 0, 0);
          canvas.style.position = 'absolute';
          canvas.style.zIndex = 100;

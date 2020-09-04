@@ -11,23 +11,25 @@ class PointCloudExtension extends Autodesk.Viewing.Extension {
         this.xaxisOffset = 0; // [computer lab]
         this.yaxisOffset = 0; // [computer lab]
         this.zaxisOffset = -1.5;
-        this.pointSize = 38;
+        this.pointSize = 30; //default PointCloud size
+        this.transparent = 0.5; //default PointCloud transparency
+
+        this.allPointClouds = false;
+        this.horizontalFlag = false;
+        this.verticalFlag = false;
     }
 
     load() {
-        window.renderPointCloud = false;
         this._renderCloud();
         return true;
     }
 
     _renderCloud(){
-        // if(renderPointCloud){
-            this.points = this._generatePointCloud();
-            // this.points.scale.set(108,73, 5); //Match size with project size. (unit: inch) [office model]
-            this.points.scale.set(38,57, 12); //Match size with project size. (unit: inch) [computer lab]
-            this.viewer.impl.createOverlayScene('pointclouds');
-            this.viewer.impl.addOverlay('pointclouds', this.points);
-        // }
+        this.points = this._generatePointCloud();
+        // this.points.scale.set(108,73, 5); //Match size with project size. (unit: inch) [office model]
+        this.points.scale.set(38,57, 12); //Match size with project size. (unit: inch) [computer lab]
+        this.viewer.impl.createOverlayScene('pointclouds');
+        this.viewer.impl.addOverlay('pointclouds', this.points);
     }
 
     unload() {
@@ -42,41 +44,29 @@ class PointCloudExtension extends Autodesk.Viewing.Extension {
         return true;
     }
 
-    
-    /**
-     * Generates {@link https://github.com/mrdoob/three.js/blob/r71/src/core/BufferGeometry.js|BufferGeometry}
-     * with (_width_ x _length_) positions and varying colors. The resulting geometry will span from -0.5 to 0.5
-     * in X and Y directions, and the Z value and colors are computed as functions of the X and Y coordinates.
-     *
-     * Based on https://github.com/mrdoob/three.js/blob/r71/examples/webgl_interactive_raycasting_pointcloud.html.
-     *
-     * @param {number} width Number of points along the X axis.
-     * @param {number} length Number of points along the Y axis.
-     * @returns {BufferGeometry} Geometry that can be used by {@link https://github.com/mrdoob/three.js/blob/r71/src/objects/PointCloud.js|PointCloud}.
-     */
     _generatePointCloudGeometry() {
         let geometry = new THREE.BufferGeometry();
+
         let numPoints = unique.length;
 		let positions = new Float32Array(numPoints * 3);
         let colors = new Float32Array(numPoints * 3);
-        let sizes = new Float32Array(numPoints * 2);
+        let uvs = new Float32Array(numPoints * 2);
         let color = new THREE.Color();
 
         for(var i = 0; i<unique.length; i++){
-            let u = unique[i].x / max_x + this.xaxisOffset;
-            let v = unique[i].y / max_y + this.yaxisOffset;
-            let w = unique[i].z / max_z + this.zaxisOffset;
-            positions[3 * i] = u;
-            positions[3 * i + 1] = v;
-            positions[3 * i + 2] = w;
+            positions[3 * i] = unique[i].x / max_x + this.xaxisOffset;
+            positions[3 * i + 1] = unique[i].y / max_y + this.yaxisOffset;
+            positions[3 * i + 2] = unique[i].z / max_z + this.zaxisOffset;
             color.setRGB(255/255, 255/255, 255/255);
             color.toArray(colors, i * 3);
-            sizes[2 * i] = this.pointSize;
+            uvs[2 * i] = this.pointSize;
+            uvs[2 * i + 1] = 0;
         }
 
+        //Add Attribute to geometry
 		geometry.addAttribute('position', new THREE.BufferAttribute(positions, 3));
         geometry.addAttribute('color', new THREE.BufferAttribute(colors, 3));
-        geometry.addAttribute('uv', new THREE.BufferAttribute(sizes, 2));
+        geometry.addAttribute('uv', new THREE.BufferAttribute(uvs, 2));
         geometry.computeBoundingBox();
         geometry.isPoints = true; // This flag will force Forge Viewer to render the geometry as gl.POINTS
         
@@ -86,29 +76,35 @@ class PointCloudExtension extends Autodesk.Viewing.Extension {
     _generatePointCloud() {
         geometry = this._generatePointCloudGeometry();
 
-        var vShader = `uniform float size;
-        varying vec3 vColor;
+        var vShader = `varying vec3 vColor;
+        varying vec2 vUv;
         void main() {
+            vUv = uv;
             vColor = color;
             vec4 mvPosition = modelViewMatrix * vec4( position, 1.0 );
-            gl_PointSize =  uv.x * ( uv.x / (length(mvPosition.xyz) + 0.00001));
+            gl_PointSize =  vUv.x * ( vUv.x / (length(mvPosition.xyz) + 0.00001));
             gl_Position = projectionMatrix * mvPosition;
         }`
-        // var fShader = `varying vec3 vColor;
-        // void main() {
-        //     gl_FragColor = vec4( vColor, 0.6 );
-        // }`
 
+        //fShader for Sprite
         var fShader = `varying vec3 vColor;
+        varying vec2 vUv;
         uniform sampler2D sprite;
         void main() {
-            gl_FragColor = vec4(vColor, 0.3 ) * texture2D( sprite, gl_PointCoord );
+            gl_FragColor = vec4(vColor,vUv.y) * texture2D( sprite, gl_PointCoord );
             if (gl_FragColor.x < 0.2) discard;
         }`
 
+        // // fShader for Regular PointClouds
+        // var fShader = `varying vec3 vColor;
+        // varying vec2 vUv;
+        // void main() {
+        //     gl_FragColor = vec4( vColor, vUv.y );
+        // }`
+
         var material = new THREE.ShaderMaterial( {
             uniforms: {
-                sprite: { type: 't', value: THREE.ImageUtils.loadTexture("./yellow.png") },
+                sprite: { type: 't', value: THREE.ImageUtils.loadTexture("./white.png") },
             },
             vertexShader: vShader,
             fragmentShader: fShader,
@@ -121,91 +117,211 @@ class PointCloudExtension extends Autodesk.Viewing.Extension {
 	
 	onToolbarCreated() {
         // Create a new toolbar group if it doesn't exist
-        this._group = this.viewer.toolbar.getControl('allMyAwesomeExtensionsToolbar');
+        this._group = this.viewer.toolbar.getControl('Extensions Toolbar');
         if (!this._group) {
-            this._group = new Autodesk.Viewing.UI.ControlGroup('allMyAwesomeExtensionsToolbar');
+            this._group = new Autodesk.Viewing.UI.ControlGroup('Extensions Toolbar');
             this.viewer.toolbar.addControl(this._group);
         }
 
-        // Add a new button to the toolbar group
-        this._button = new Autodesk.Viewing.UI.Button('myAwesomeExtensionButton');
+        // Add the button for 'PointClouds ON/OFF'
+        this._button = new Autodesk.Viewing.UI.Button('PointClouds ON/OFF');
         this._button.onClick = (ev) => {
-            window.renderPointCloud = true;
-
-            this._renderCloud();
-            if(window.legendOFF){
-                this._appearLegend();
-                window.legendOFF = false;
-            }
-
-            var i = 0;
-                
-            var interval = setInterval(() => {
-                this._updatePointCloudGeometry(changedata[i]);
-                if (++i == changedata.length) window.clearInterval(interval);
-            }, 22.5);
+            this._showTangentPlane('ALL');
         };
+        this._button.setToolTip('PointClouds ON/OFF');
+        this._button.addClass('pointcloudIcon');
+        this._group.addControl(this._button);
 
-        this._button.setToolTip('PointCloud Extension');
+        // Add the button for 'View the Simulation'
+        this._button = new Autodesk.Viewing.UI.Button('View the Simulation');
+        this._button.onClick = (ev) => {
+            if(this.allPointClouds){ //Simulation only run when PointClouds are showing
+                if(!window.legendON){
+                    this._appearLegend(); //Appear the color legend
+                    window.legendON = true;
+                }
+                var i = 0;
+                var interval = setInterval(() => {
+                    this._viewSimulation(changedata[i]);
+                    if (++i == changedata.length) window.clearInterval(interval);
+                }, 22.5);
+            }
+        };
+        this._button.setToolTip('View the Simulation');
+        this._button.addClass('pointcloudIcon');
+        this._group.addControl(this._button);
+
+        // Add the button for 'Vertical Tangent Plane View'
+        this._button = new Autodesk.Viewing.UI.Button('Vertical Tangent Plane View');
+        this._button.onClick = (ev) => {
+            if(this.allPointClouds){ // Button only work when PointClouds are showing
+                this._showTangentPlane('vertical');
+            }
+        };
+        this._button.setToolTip('Vertical Tangent Plane View');
+        this._button.addClass('pointcloudIcon');
+        this._group.addControl(this._button);
+
+        // Add the button for 'Horizontal Tangent Plane View'
+        this._button = new Autodesk.Viewing.UI.Button('Horizontal Tangent Plane View');
+        this._button.onClick = (ev) => {
+            if(this.allPointClouds){ // Button only work when PointClouds are showing
+                this._showTangentPlane('horizontal');
+            }
+        };
+        this._button.setToolTip('Horizontal Tangent Plane View');
         this._button.addClass('pointcloudIcon');
         this._group.addControl(this._button);
     }
 
-    _updatePointCloudGeometry(messages) {
+    _viewSimulation(messages) {
         var colors = this.points.geometry.attributes.color.array;
-        var sizes = this.points.geometry.attributes.uv.array;
-        let percent = 0;
+        var uvs = this.points.geometry.attributes.uv.array;
 
         for (var i = 0; i < messages.length; i++) {
             var m = messages[i];
             var color1 = {r:0,g:0,b:255};
             var color2 = {r:255,g:255,b:255};
             var color3 = {r:255,g:0,b:0};
-            var colorRange = {min:250, mid:500, max:690};
+            var concRange = {min:250, mid:500, max:690};
+            var sizeRange = {min:0.8, mid:1, max:1.5};
+            var transRange = {min:0.3, mid:0.5, max:1.0};
             let r;
             let g;
             let b;
+            let percent = 0;
             let sizePercent;
+            let transPercent;
 
-            if(m.state <= colorRange.min){
+            // Color, size and transparency dynamic changes dependent on CO2 concentration
+            if(m.state <= concRange.min){
                 r = color1.r;
                 g = color1.g;
                 b = color1.b;
-                sizePercent = 0.9;
-            }else if(m.state > colorRange.min && m.state < colorRange.mid){
-                percent = (m.state - colorRange.min) / (colorRange.mid - colorRange.min);
+                sizePercent = sizeRange.min;
+                transPercent = transRange.min;
+            }else if(m.state > concRange.min && m.state < concRange.mid){
+                percent = (m.state - concRange.min) / (concRange.mid - concRange.min);
                 r = color1.r + percent * (color2.r - color1.r);
                 g = color1.g + percent * (color2.g - color1.g);
                 b = color1.b + percent * (color2.b - color1.b);
-                sizePercent = 1 - percent*0.1;
-            }else if(m.state == colorRange.mid){
+                sizePercent = sizeRange.min + percent * (sizeRange.mid - sizeRange.min);
+                transPercent = transRange.min + percent * (transRange.mid - transRange.min);
+            }else if(m.state == concRange.mid){
                 r = color2.r;
                 g = color2.g;
                 b = color2.b;
-                sizePercent = 1;
-            }else if(m.state > colorRange.mid && m.state < colorRange.max){
-                percent = (m.state - colorRange.mid) / (colorRange.max - colorRange.mid);
+                sizePercent = sizeRange.mid;
+                transPercent = transRange.mid;
+            }else if(m.state > concRange.mid && m.state < concRange.max){
+                percent = (m.state - concRange.mid) / (concRange.max - concRange.mid);
                 r = color2.r + percent * (color3.r - color2.r);
                 g = color2.g + percent * (color3.g - color2.g);
                 b = color2.b + percent * (color3.b - color2.b);
-                sizePercent = 1 + percent*0.5;
+                sizePercent = sizeRange.mid + percent * (sizeRange.max - sizeRange.mid);
+                transPercent = transRange.mid + percent * (transRange.max - transRange.mid);
             }else{
                 r = color3.r;
                 g = color3.g;
                 b = color3.b;
-                sizePercent = 1.5;
+                sizePercent = sizeRange.max;
+                transPercent = transRange.max;
             }
 
-            let k = unique.findIndex(obj => obj.x === m.x && obj.y === m.y && obj.z === m.z);
+            let k = unique.findIndex(obj => obj.x === m.x && obj.y === m.y && obj.z === m.z); //find the index for this PointCloud
 
             let color = new THREE.Color();
             color.setRGB(r/255,g/255,b/255);
-            colors[3 * k] = color.r;       // r=1 when 0<w<1
-            colors[3 * k + 1] = color.g;   // g=1 when w==1
-            colors[3 * k + 2] = color.b;   // b=1 when -1<w<0
-            sizes[2 * k] = this.pointSize * sizePercent;
+            colors[3 * k] = color.r;
+            colors[3 * k + 1] = color.g;
+            colors[3 * k + 2] = color.b;
+            uvs[2 * k] = this.pointSize * sizePercent; //Dynamic size change
+
+            //Dynamic transparency change
+            if(this.verticalFlag && this.horizontalFlag){ //Both horizontal and vitical part hid, change on part PointClouds.
+                if(!(unique[k].z > 4 || unique[k].x > max_x/2)){
+                    uvs[2 * k + 1] = transPercent;
+                }
+            }else if(this.verticalFlag){ //Only vitical part hid, change on part of PointClouds.
+                if(!(unique[k].z > 4)){
+                    uvs[2 * k + 1] = transPercent;
+                }
+            }else if(this.horizontalFlag){
+                if(!(unique[k].x > max_x/2)){ //Only horizontal part hid, change on part of PointClouds.
+                    uvs[2 * k + 1] = transPercent;
+                }
+            }else{ //PointCloud all showing, change on all PointClouds.
+                uvs[2 * k + 1] = transPercent;
+            }
         }
         this.points.geometry.attributes.color.needsUpdate=true;
+        this.points.geometry.attributes.uv.needsUpdate=true;
+        this.viewer.impl.invalidate(true,false,true);
+    }
+
+    _showTangentPlane(section){
+        var uvs = this.points.geometry.attributes.uv.array;
+        if(section == 'ALL'){ //Button 'PointClouds ON/OFF' pressed.
+            if(this.allPointClouds){
+                for(var i = 0; i < unique.length; i++){
+                    uvs[2 * i + 1] = 0;
+                }
+                this.allPointClouds = false;
+            } else{
+                for(var i = 0; i < unique.length; i++){
+                    uvs[2 * i + 1] = this.transparent;
+                }
+                this.horizontalFlag = false;
+                this.verticalFlag = false;
+                this.allPointClouds = true;
+            }
+        } else if(section == 'vertical'){ //Button 'Vertical Tangent Plane View' pressed.
+            if(this.verticalFlag && this.horizontalFlag){ //Both horizontal and vitical part hid, show part PointClouds.
+                for(var i = 0; i < unique.length; i++){
+                    if(unique[i].z > 4 && !(unique[i].x > max_x/2)){
+                        uvs[2 * i + 1] = this.transparent;
+                    }
+                }
+                this.verticalFlag = false;
+            }else if(this.verticalFlag) { //Only vitical part hid, show all PointClouds.
+                for(var i = 0; i < unique.length; i++){
+                    if(unique[i].z > 4){
+                        uvs[2 * i + 1] = this.transparent;
+                    }
+                }
+                this.verticalFlag = false;
+            }else{ //PointCloud all showing, hide vertical side.
+                for(var i = 0; i < unique.length; i++){
+                    if(unique[i].z > 4){
+                        uvs[2 * i + 1] = 0;
+                    }
+                }
+                this.verticalFlag = true;
+            }
+        } else if(section == 'horizontal'){ //Button 'Horizontal Tangent Plane View' pressed.
+            if(this.verticalFlag && this.horizontalFlag){ //Both horizontal and vitical part hid, show part PointClouds.
+                for(var i = 0; i < unique.length; i++){
+                    if(unique[i].x > max_x/2 && !(unique[i].z > 4)){
+                        uvs[2 * i + 1] = this.transparent;
+                    }
+                }
+                this.horizontalFlag = false;
+            }else if(this.horizontalFlag){ //Only horizontal part hid, show all PointClouds.
+                for(var i = 0; i < unique.length; i++){
+                    if(unique[i].x > max_x/2){
+                        uvs[2 * i + 1] = this.transparent;
+                    }
+                }
+                this.horizontalFlag = false;
+            }else{ //PointCloud all showing, hide vertical side.
+                for(var i = 0; i < unique.length; i++){
+                    if(unique[i].x > max_x/2){
+                        uvs[2 * i + 1] = 0;
+                    }
+                }
+                this.horizontalFlag = true;
+            }
+        }
         this.points.geometry.attributes.uv.needsUpdate=true;
         this.viewer.impl.invalidate(true,false,true);
     }

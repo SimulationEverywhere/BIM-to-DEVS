@@ -1,6 +1,6 @@
 d3.csv("/data/state_changing_3D_computerLab.csv", function(data) {
 	window.changedata = [];
-	window.legendOFF = true;
+	window.legendON = false;
 	
 	window.max_x = d3.max(data, d => +d.x) + 1;
 	window.max_y = d3.max(data, d => +d.y) + 1;

@@ -1,6 +1,6 @@
 
 class DataExtractExtension extends Autodesk.Viewing.Extension {
-    
+
     constructor(viewer, options) {
         super(viewer, options);
         this._group = null;
@@ -53,8 +53,101 @@ class DataExtractExtension extends Autodesk.Viewing.Extension {
     }
 
     extractObjDict(ids) {
-        var thisRef = this;        
-      
+        jQuery.ajax({
+                    url: '/api/forge/extract',
+                    data:{ urn: document.active_urn,
+                            view_name: "3D",
+                            height: 10,
+                            default_state:{"counter": -1, "concentration": 500, "type": -100},
+                            parts : [
+                                {
+                                    name : "walls",
+                                    state: {"concentration": 500, "type": -300, "counter": -1},
+                                    sql  : `
+                                    SELECT DISTINCT
+                                    	entity_id AS id
+                                    FROM
+                                    	_objects_eav
+                                    	LEFT OUTER JOIN _objects_id ON _objects_eav.entity_id = _objects_id.id
+                                    	LEFT OUTER JOIN _objects_attr ON _objects_eav.attribute_id = _objects_attr.id
+                                    	LEFT OUTER JOIN _objects_val ON _objects_eav.value_id = _objects_val.id
+                                    WHERE
+                                    	category == "__category__" AND (
+                                    		value == "Revit Walls" or
+                                    		value == "Revit Casework" or
+                                    		value == "Revit Structural Columns");`.replace(/\s+/g, ' ')
+                                },{
+                                    name : "doors", /*For this building, there are no external doors, so we will allow air to pass through*/
+                                    state: {"concentration": 500, "type": -100, "counter": -1},
+                                    sql  : `
+                                    SELECT DISTINCT
+                                    	entity_id AS id
+                                    FROM
+                                    	_objects_eav
+                                    	LEFT OUTER JOIN _objects_id ON _objects_eav.entity_id = _objects_id.id
+                                    	LEFT OUTER JOIN _objects_attr ON _objects_eav.attribute_id = _objects_attr.id
+                                    	LEFT OUTER JOIN _objects_val ON _objects_eav.value_id = _objects_val.id
+                                    WHERE
+                                    	category == "__category__" AND
+                                    	value    == "Revit Doors";`.replace(/\s+/g, ' ')
+                                },{
+                                    name : "windows",
+                                    state: {"concentration": 500, "type": -500, "counter": -1},
+                                    sql  : `
+                                    SELECT DISTINCT
+                                    	entity_id AS id
+                                    FROM
+                                    	_objects_eav
+                                    	LEFT OUTER JOIN _objects_id ON _objects_eav.entity_id = _objects_id.id
+                                    	LEFT OUTER JOIN _objects_attr ON _objects_eav.attribute_id = _objects_attr.id
+                                    	LEFT OUTER JOIN _objects_val ON _objects_eav.value_id = _objects_val.id
+                                    WHERE
+                                    	category == "__category__" AND (
+                                    	   value == "Revit Walls" or
+                                    	   value == "Revit Casework" or
+                                    	   value == "Revit Structural Columns");`.replace(/\s+/g, ' ')
+                                },{
+                                    name : "chairs",
+                                    state: {"concentration": 500, "type": -700, "counter": -1},
+                                    sql  : `
+                                    SELECT DISTINCT
+                                    	entity_id AS id
+                                    FROM
+                                    	_objects_eav
+                                    	LEFT OUTER JOIN _objects_id ON _objects_eav.entity_id = _objects_id.id
+                                    	LEFT OUTER JOIN _objects_attr ON _objects_eav.attribute_id = _objects_attr.id
+                                    	LEFT OUTER JOIN _objects_val ON _objects_eav.value_id = _objects_val.id
+                                    WHERE
+                                    	category == "Identity Data" AND (
+                                    	   value == "chair model 01A" OR
+                                    	   value == "chair model 01C" OR
+                                    	   value == "chair model 01D");`.replace(/\s+/g, ' ')
+                                },{
+                                    name : "vents",
+                                    state: {"concentration": 500, "type": -600, "counter": -1},
+                                    sql  : `
+                                    SELECT DISTINCT
+                                    	entity_id AS id
+                                    FROM
+                                    	_objects_eav
+                                    	LEFT OUTER JOIN _objects_id ON _objects_eav.entity_id = _objects_id.id
+                                    	LEFT OUTER JOIN _objects_attr ON _objects_eav.attribute_id = _objects_attr.id
+                                    	LEFT OUTER JOIN _objects_val ON _objects_eav.value_id = _objects_val.id
+                                    WHERE
+                                    	category == "Identity Data" AND (
+                                            value LIKE "Vent 01%" OR
+                                    		value LIKE "Vent 02%");`.replace(/\s+/g, ' ')
+                                }
+                            ]},
+                    success: function(result) {
+                        console.log(result)
+                        DataExtractExtension.download(JSON.stringify(result), "cadmium_bim_co2.json", "application/json")
+                    }
+                })
+
+        /*
+        var thisRef = this;
+
         //elementID matching bounding box
         viewer.model.getBulkProperties(ids, ['Category'],
             function(elements){
@@ -62,7 +155,7 @@ class DataExtractExtension extends Autodesk.Viewing.Extension {
                 var datas = [];
                 for(var d=0; d<elements.length; d++){
                     var category = elements[d].properties[0].displayValue;
-                    if(category == "Revit Walls" || category == "Revit Windows" || category == "Revit Doors" || category == "Revit Mechanical Equipment") { 
+                    if(category == "Revit Walls" || category == "Revit Windows" || category == "Revit Doors" || category == "Revit Mechanical Equipment") {
                             dataID.push(elements[d].dbId);
                              var objType = category.substring(6, category.length-1);
                              datas.push({"id": elements[d].dbId, "type": objType});
@@ -70,9 +163,9 @@ class DataExtractExtension extends Autodesk.Viewing.Extension {
                 }
                 DataExtractExtension.getDBID_ChairsOnly(dataID, datas);
             }
-        );
-    }   
-    
+        );*/
+    }
+
     static getDBID_ChairsOnly(dataID, datas) {
         function doneSearch(dbids) {
             // dbids here are all the chairs
@@ -80,7 +173,7 @@ class DataExtractExtension extends Autodesk.Viewing.Extension {
             var dbIDS = [];
             var arr =[];
             dbIDS = dataID.concat(dbids);
-            
+
             for(let i = 0; i < dbids.length; i++){
                 arr.push({"id": dbids[i], "type": 'Chair'});
             }
@@ -97,7 +190,7 @@ class DataExtractExtension extends Autodesk.Viewing.Extension {
          var cellSize  = 0.25;
          const bounds = viewer.model.getBoundingBox();
          const width = Math.floor((bounds.max.x - bounds.min.x) / cellSize);
-         const height = Math.floor((bounds.max.y - bounds.min.y) / cellSize);  
+         const height = Math.floor((bounds.max.y - bounds.min.y) / cellSize);
          const canvas = document.createElement('canvas');
          canvas.setAttribute('width', width + 'px');
          canvas.setAttribute('height', height + 'px');
@@ -111,10 +204,10 @@ class DataExtractExtension extends Autodesk.Viewing.Extension {
                  ray.origin.x = bounds.min.x + k * cellSize;
                  ray.origin.y = bounds.min.y + j * cellSize;
                  const intersection = viewer.impl.rayIntersect(ray, false, dataID);
-                
+
                   if (intersection){
 
-                    //getting the intersected points to be used for Cadmium input 
+                    //getting the intersected points to be used for Cadmium input
                        for(let c = 0; c < datas.length; c++) {
                             if(datas[c].id == intersection.dbId)
                                intersectionData.push({"point":intersection.intersectPoint, "dbID":intersection.dbId, "type":datas[c].type});

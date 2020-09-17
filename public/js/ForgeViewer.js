@@ -12,17 +12,19 @@ function launchViewer(urn) {
     var documentId = 'urn:' + urn;
     Autodesk.Viewing.Document.load(documentId, onDocumentLoadSuccess, onDocumentLoadFailure);
   });
-}
 
-function onDocumentLoadSuccess(doc) {
-  var viewables = doc.getRoot().getDefaultGeometry();
-  viewer.loadDocumentNode(doc, viewables).then(i => {
-    // documented loaded, any action?
-  });
-}
 
-function onDocumentLoadFailure(viewerErrorCode) {
-  console.error('onDocumentLoadFailure() - errorCode:' + viewerErrorCode);
+  function onDocumentLoadSuccess(doc) {
+    document.active_urn = urn; // this is for the exctract call later, there is a better way, but this should work for now
+    var viewables = doc.getRoot().getDefaultGeometry();
+    viewer.loadDocumentNode(doc, viewables).then(i => {
+      // documented loaded, any action?
+    });
+  }
+
+  function onDocumentLoadFailure(viewerErrorCode) {
+    console.error('onDocumentLoadFailure() - errorCode:' + viewerErrorCode);
+  }
 }
 
 function getForgeToken(callback) {

@@ -12,6 +12,9 @@
     "cookie-session": "^1.4.0",
     "express": "^4.17.1",
     "forge-apis": "^0.7.3",
-    "multer": "^1.4.2"
+    "multer": "^1.4.2",
+    "obj-file-parser": "^0.5.1",
+    "request-promise": "^4.2.6",
+    "sqlite-async": "^1.1.0"
   }
 }

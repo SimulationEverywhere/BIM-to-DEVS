@@ -1,2 +1,5 @@
 uploads/
 node_modules/
+
+# PyCharm stuff
+.idea/

@@ -39,7 +39,14 @@ router.get('/extract', async (req, res, next) => {
     var view_metadata = designdata_metadata.data.metadata.find(x => x.name.includes(query.view_name || "3D"))
 
     if(!view_metadata) throw("Metadata with "+view_name+"not found, did you want "+JSON.stringify(designdata_metadata.data.metadata)  );
+
+    /* Freeing this*/
+    designdata_metadata = null
+
     var guid = view_metadata.guid
+
+    /* Freeing this*/
+    view_metadata = null
 
     //If there are sql query strings in the request, add the ids that they select for in order to the end of the list of catagories
     if(query.sql && query.sql.length){
@@ -105,6 +112,9 @@ router.get('/extract', async (req, res, next) => {
     //console.log(JSON.parse(manifest_body))
     //console.log()
 
+    /* Freeing this*/
+    manifest_body = null
+
     const set_identity = ((l1, l2) => {
         l1 = l1.filter((v,i,arr) => arr.indexOf(v) === i)
         l2 = l2.filter((v,i,arr) => arr.indexOf(v) === i)
@@ -125,6 +135,9 @@ router.get('/extract', async (req, res, next) => {
     //console.log(derivatives)
     let obj_manifest = derivatives.find(x => (x.outputType && x.outputType === "obj"))
     if(!obj_manifest) throw("There are no obj files, try again?");
+
+    /* Freeing this*/
+    derivatives = null
 
     //console.log(obj_manifest)
 
@@ -161,6 +174,9 @@ router.get('/extract', async (req, res, next) => {
 
     })
 
+    /* Freeing this*/
+    obj_manifest = null
+
     console.log("obj file urns")
     console.log(obj_file_urns)
 
@@ -194,6 +210,7 @@ router.get('/extract', async (req, res, next) => {
         handle_obj_file(obj_files)
     )
 })
+
 
 
 function handle_obj_file(obj_list){

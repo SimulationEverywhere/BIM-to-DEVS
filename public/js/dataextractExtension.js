@@ -52,222 +52,93 @@ class DataExtractExtension extends Autodesk.Viewing.Extension {
 
     }
 
-    extractObjDict(ids) {
-        jQuery.ajax({
-                    url: '/api/forge/extract',
-                    data:{ urn: document.active_urn,
-                            view_name: "3D",
-                            height: 10,
-                            default_state:{"counter": -1, "concentration": 500, "type": -100},
-                            parts : [
-                                {
-                                    name : "walls",
-                                    state: {"concentration": 500, "type": -300, "counter": -1},
-                                    sql  : `
-                                    SELECT DISTINCT
-                                    	entity_id AS id
-                                    FROM
-                                    	_objects_eav
-                                    	LEFT OUTER JOIN _objects_id ON _objects_eav.entity_id = _objects_id.id
-                                    	LEFT OUTER JOIN _objects_attr ON _objects_eav.attribute_id = _objects_attr.id
-                                    	LEFT OUTER JOIN _objects_val ON _objects_eav.value_id = _objects_val.id
-                                    WHERE
-                                    	category == "__category__" AND (
-                                    		value == "Revit Walls" or
-                                    		value == "Revit Casework" or
-                                    		value == "Revit Structural Columns");`.replace(/\s+/g, ' ')
-                                },{
-                                    name : "doors", /*For this building, there are no external doors, so we will allow air to pass through*/
-                                    state: {"concentration": 500, "type": -100, "counter": -1},
-                                    sql  : `
-                                    SELECT DISTINCT
-                                    	entity_id AS id
-                                    FROM
-                                    	_objects_eav
-                                    	LEFT OUTER JOIN _objects_id ON _objects_eav.entity_id = _objects_id.id
-                                    	LEFT OUTER JOIN _objects_attr ON _objects_eav.attribute_id = _objects_attr.id
-                                    	LEFT OUTER JOIN _objects_val ON _objects_eav.value_id = _objects_val.id
-                                    WHERE
-                                    	category == "__category__" AND
-                                    	value    == "Revit Doors";`.replace(/\s+/g, ' ')
-                                },{
-                                    name : "windows",
-                                    state: {"concentration": 500, "type": -500, "counter": -1},
-                                    sql  : `
-                                    SELECT DISTINCT
-                                    	entity_id AS id
-                                    FROM
-                                    	_objects_eav
-                                    	LEFT OUTER JOIN _objects_id ON _objects_eav.entity_id = _objects_id.id
-                                    	LEFT OUTER JOIN _objects_attr ON _objects_eav.attribute_id = _objects_attr.id
-                                    	LEFT OUTER JOIN _objects_val ON _objects_eav.value_id = _objects_val.id
-                                    WHERE
-                                    	category == "__category__" AND (
-                                    	   value == "Revit Walls" or
-                                    	   value == "Revit Casework" or
-                                    	   value == "Revit Structural Columns");`.replace(/\s+/g, ' ')
-                                },{
-                                    name : "chairs",
-                                    state: {"concentration": 500, "type": -700, "counter": -1},
-                                    sql  : `
-                                    SELECT DISTINCT
-                                    	entity_id AS id
-                                    FROM
-                                    	_objects_eav
-                                    	LEFT OUTER JOIN _objects_id ON _objects_eav.entity_id = _objects_id.id
-                                    	LEFT OUTER JOIN _objects_attr ON _objects_eav.attribute_id = _objects_attr.id
-                                    	LEFT OUTER JOIN _objects_val ON _objects_eav.value_id = _objects_val.id
-                                    WHERE
-                                    	category == "Identity Data" AND (
-                                    	   value == "chair model 01A" OR
-                                    	   value == "chair model 01C" OR
-                                    	   value == "chair model 01D");`.replace(/\s+/g, ' ')
-                                },{
-                                    name : "vents",
-                                    state: {"concentration": 500, "type": -600, "counter": -1},
-                                    sql  : `
-                                    SELECT DISTINCT
-                                    	entity_id AS id
-                                    FROM
-                                    	_objects_eav
-                                    	LEFT OUTER JOIN _objects_id ON _objects_eav.entity_id = _objects_id.id
-                                    	LEFT OUTER JOIN _objects_attr ON _objects_eav.attribute_id = _objects_attr.id
-                                    	LEFT OUTER JOIN _objects_val ON _objects_eav.value_id = _objects_val.id
-                                    WHERE
-                                    	category == "Identity Data" AND (
-                                            value LIKE "Vent 01%" OR
-                                    		value LIKE "Vent 02%");`.replace(/\s+/g, ' ')
-                                }
-                            ]},
-                    success: function(result) {
-                        console.log(result)
-                        DataExtractExtension.download(JSON.stringify(result), "cadmium_bim_co2.json", "application/json")
-                    }
+
+    async extractObjDict(ids){
+        let catagories = ["Revit Walls", "Revit Windows"]
+        let sql_queries = [
+                        `SELECT DISTINCT
+                        	entity_id AS id
+                        FROM
+                        	_objects_eav
+                        	LEFT OUTER JOIN _objects_id ON _objects_eav.entity_id = _objects_id.id
+                        	LEFT OUTER JOIN _objects_attr ON _objects_eav.attribute_id = _objects_attr.id
+                        	LEFT OUTER JOIN _objects_val ON _objects_eav.value_id = _objects_val.id
+                        WHERE
+                        	category == "__category__" AND
+                        	value    == "Revit Doors";`.replace(/\s+/g, ' ')
+                    ]
+
+        const filter_object_ids = async (ids, catagories) => {
+            const getBulkPropertiesPromise = (...args) => {
+                return new Promise((resolve, reject) => {
+                    viewer.model.getBulkProperties(...args, (data) => {
+                        resolve(data)
+                    })
                 })
-
-        /*
-        var thisRef = this;
-
-        //elementID matching bounding box
-        viewer.model.getBulkProperties(ids, ['Category'],
-            function(elements){
-                var dataID = [];
-                var datas = [];
-                for(var d=0; d<elements.length; d++){
-                    var category = elements[d].properties[0].displayValue;
-                    if(category == "Revit Walls" || category == "Revit Windows" || category == "Revit Doors" || category == "Revit Mechanical Equipment") {
-                            dataID.push(elements[d].dbId);
-                             var objType = category.substring(6, category.length-1);
-                             datas.push({"id": elements[d].dbId, "type": objType});
-                    }
-                }
-                DataExtractExtension.getDBID_ChairsOnly(dataID, datas);
             }
-        );*/
-    }
-
-    static getDBID_ChairsOnly(dataID, datas) {
-        function doneSearch(dbids) {
-            // dbids here are all the chairs
-            // this is where you do a rayhit
-            var dbIDS = [];
-            var arr =[];
-            dbIDS = dataID.concat(dbids);
-
-            for(let i = 0; i < dbids.length; i++){
-                arr.push({"id": dbids[i], "type": 'Chair'});
+            var outputs = []
+            while(outputs.length < catagories.length){
+                outputs.push([])
             }
-
-            Array.prototype.push.apply(datas,arr);
-            DataExtractExtension.drawcanvas(dbIDS, datas);
+            await getBulkPropertiesPromise(ids, ['Category'])
+                .then((elms) => {
+                    elms.forEach((elm) => {
+                        catagories.forEach((cat, index) => {
+                            if(cat == elm.properties[0].displayValue){
+                                outputs[index].push(elm.dbId)
+                            }
+                        })
+                    })
+                })
+            return outputs
         }
-        viewer.search('"Chair model 01 ["', dbids => {
-            doneSearch(dbids)}, null, ["name"] );
+
+
+        var filtered_ids = await filter_object_ids(ids, catagories)
+        console.log(filtered_ids)
+        jQuery.get('/api/forge/extract',
+                {
+                    urn        : document.active_urn,
+                    view_name  : "3D",
+                    catagories : JSON.stringify(filtered_ids),
+                    sql        : sql_queries
+                },
+                (result) => {
+                    console.log(result)
+                    DataExtractExtension.drawcanvas(result)
+                    DataExtractExtension.download(JSON.stringify(result), "cadmium_bim_co2.json", "application/json")
+                })
     }
 
-    static drawcanvas(dataID, datas) {
-        //ray-shooter bounding box method
-         var cellSize  = 0.25;
-         const bounds = viewer.model.getBoundingBox();
-         const width = Math.floor((bounds.max.x - bounds.min.x) / cellSize);
-         const height = Math.floor((bounds.max.y - bounds.min.y) / cellSize);
-         const canvas = document.createElement('canvas');
-         canvas.setAttribute('width', width + 'px');
-         canvas.setAttribute('height', height + 'px');
-         const context = canvas.getContext('2d');
-         const data = context.getImageData(0, 0, width, height);
-         let ray = new THREE.Ray(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0.1, 0.1, -1));
-         let i = 0;
-         var intersectionData = [];
-         for (let j = 0; j < height; j++) {
-             for (let k = 0; k < width; k++) {
-                 ray.origin.x = bounds.min.x + k * cellSize;
-                 ray.origin.y = bounds.min.y + j * cellSize;
-                 const intersection = viewer.impl.rayIntersect(ray, false, dataID);
-
-                  if (intersection){
-
-                    //getting the intersected points to be used for Cadmium input
-                       for(let c = 0; c < datas.length; c++) {
-                            if(datas[c].id == intersection.dbId)
-                               intersectionData.push({"point":intersection.intersectPoint, "dbID":intersection.dbId, "type":datas[c].type});
-                         }
-
-                            // COLOR THE OBJECTS IN THE IMAGE
-                            var objType=datas.filter((row)=>{
-                                if(row.id==intersection.dbId){
-                                    return row;
-                                }
-                            });
-                            var type="";
-                            if(objType.length>0){
-                                type=objType[0].type;
-                            }
-                            if(type=="Wall"){
-                                data.data[i] = 0;
-                                data.data[i + 1] = 0;
-                                data.data[i + 2] = 0;
-                                data.data[i + 3] = 255;
-                            }else if(type=="Window"){
-                                data.data[i] = 255;
-                                data.data[i + 1] = 0;
-                                data.data[i + 2] = 0;
-                                data.data[i + 3] = 255;
-                            }else if(type=="Door"){
-                                data.data[i] = 0;
-                                data.data[i + 1] = 255;
-                                data.data[i + 2] = 0;
-                                data.data[i + 3] = 255;
-                            }
-                            else if(type=="Chair"){
-                                data.data[i] = 255;
-                                data.data[i + 1] = 0;
-                                data.data[i + 2] = 255;
-                                data.data[i + 3] = 255;
-                            }
-                            else if(type=="Mechanical Equipmen"){
-                                data.data[i] = 0;
-                                data.data[i + 1] = 0;
-                                data.data[i + 2] = 255;
-                                data.data[i + 3] = 255;
-                            }
-                            else{
-                            data.data[i] = 0;
-                            data.data[i + 1] = 255;
-                            data.data[i + 2] = 255;
-                            data.data[i + 3] = 255;
-                            }
-                  }
-                 i += 4;
-             }
-         }
-         //console.log(intersectionData);
-         var dataStr = JSON.stringify(intersectionData).replace(/\"([^(\")"]+)\":/g,"$1:");
-         DataExtractExtension.download(dataStr, "config.json", "application/json");
-         context.putImageData(data, 0, 0);
-         canvas.style.position = 'absolute';
-         canvas.style.zIndex = 100;
-         document.body.appendChild(canvas);
+    static drawcanvas(results) {
+        const cell_size = 4
+        for(var z = 0; z<results.space[0][0].length; z++){
+            let canvas = document.createElement('canvas');
+            canvas.id="z="+z
+            canvas.width=results.space.length*cell_size
+            canvas.height=results.space[0].length*cell_size
+            document.body.appendChild(canvas);
+            var ctx = canvas.getContext("2d");
+            results.space.forEach((sub_space, x) => {
+                sub_space.forEach((sub_sub_space, y) => {
+                    var val = sub_sub_space[z]
+                    if(val[2]){
+                        //door
+                        ctx.fillStyle = "rgb(0, 255, 0)"
+                    }else if(val[1]){
+                        //window
+                        ctx.fillStyle = "rgb(255, 0, 0)"
+                    }else if(val[0]){
+                        //wall
+                        ctx.fillStyle = "rgb(0, 0, 0)"
+                    }else{
+                        //air
+                        ctx.fillStyle = "rgb(255, 255, 255)"
+                    }
+                    ctx.fillRect( x*cell_size, y*cell_size, cell_size, cell_size)
+                })
+            })
+        }
     }
 
     static download(data, filename, type) {

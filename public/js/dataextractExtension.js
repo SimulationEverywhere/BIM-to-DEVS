@@ -134,15 +134,15 @@ class DataExtractExtension extends Autodesk.Viewing.Extension {
     }
 
     static drawcanvas(results) {
-        const cell_size = 4
-        for(var z = 0; z<results.space[0][0].length; z++){
+        const cell_scale = 16
+        for(var z = 0; z<results.cells[0][0].length; z++){
             let canvas = document.createElement('canvas');
             canvas.id="z="+z
-            canvas.width=results.space.length*cell_size
-            canvas.height=results.space[0].length*cell_size
+            canvas.width=results.cells.length*results.cell_size[0]*cell_scale
+            canvas.height=results.cells[0].length*results.cell_size[1]*cell_scale
             document.body.appendChild(canvas);
             var ctx = canvas.getContext("2d");
-            results.space.forEach((sub_space, x) => {
+            results.cells.forEach((sub_space, x) => {
                 sub_space.forEach((sub_sub_space, y) => {
                     var val = sub_sub_space[z]
                     if(val & 1<<2){
@@ -158,7 +158,7 @@ class DataExtractExtension extends Autodesk.Viewing.Extension {
                         //air
                         ctx.fillStyle = "rgb(255, 255, 255)"
                     }
-                    ctx.fillRect( x*cell_size, y*cell_size, cell_size, cell_size)
+                    ctx.fillRect( x*results.cell_size[0]*cell_scale, y*results.cell_size[1]*cell_scale, results.cell_size[0]*cell_scale, results.cell_size[1]*cell_scale)
                 })
             })
         }

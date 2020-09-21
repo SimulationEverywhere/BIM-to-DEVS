@@ -64,6 +64,23 @@ router.get('/extract', async (req, res, next) => {
     console.log("id lists:")
     console.log(cats)
 
+    //Breake up the catagories into managable lumps
+    const segment_size = 200
+    var segments = cats.map((cat) => {
+            if(cat){
+                var arr = []
+                for(var index = 0; index*segment_size < cat.length; index++){
+                    arr.push(cat.slice(index*segment_size, (index+1)*segment_size))
+                }
+                return arr
+            }else{
+                return []
+            }
+        }).reduce((acc, cur, index)=> {
+            cur.forEach(s => acc.push({type:index, ids:s}))
+            return acc
+        }, [])
+
     //
     const post_retry_on_fail = async(options, max_retries = 5) => {
         request_promise.post(options).catch((x)=>{
@@ -75,8 +92,10 @@ router.get('/extract', async (req, res, next) => {
         })
     }
 
+    console.log("split catagories into "+segments.length+" segments")
+
     //Send off the jobs
-    await Promise.all(cats.filter((cat, index, arr) => {cat.length > 0 && arr.indexOf(cat) === index}).map(async (cat) => {
+    await Promise.all(segments.map(async (seg) => {
         return await post_retry_on_fail({
             url:"https://developer.api.autodesk.com/modelderivative/v2/designdata/job",
             body:JSON.stringify(
@@ -90,7 +109,7 @@ router.get('/extract', async (req, res, next) => {
                                 advanced: {
                                     unit:"meter",
                                     modelGuid:guid,
-                                    objectIds:cat
+                                    objectIds:seg.ids
                                 }
                             }
                         ]
@@ -141,37 +160,32 @@ router.get('/extract', async (req, res, next) => {
 
     //console.log(obj_manifest)
 
-    let obj_file_urns = cats.map((cat, i) => {
-        if(cat.length <= 0){
-            return null
-        }else{
-            for(index in obj_manifest.children){
-                if(set_identity(obj_manifest.children[index].objectIds, cat)){
-                    return obj_manifest.children[index].urn
-                }
+    let obj_file_urns = segments.map((seg, i) => {
+        for(index in obj_manifest.children){
+            if(set_identity(obj_manifest.children[index].objectIds, seg.ids)){
+                return {type:seg.type, urn:obj_manifest.children[index].urn}
             }
-            console.log("No exact match for "+i+" looking for the obj with the most matches without having any extras next")
-            return obj_manifest.children[
-                obj_manifest.children.map((child, index) => {
-                    return child.objectIds.reduce((acc, id) => {
-                        if(cat.includes(id)){
-                            return [acc[0], acc[1]+1, acc[2]]
-                        }else{
-                            return [acc[0], acc[1], acc[2]+1]
-                        }
-
-                    }, [index, 0,0])
-                }).reduce((acc, cur) => {
-                    if(cur[2] == 0 && cur[1] > acc[1]){
-                        return cur
-                    }else{
-                        return acc
-                    }
-                })[0]
-                ].urn
-            //throw("no obj file for these ids: "+JSON.stringify(cat))
         }
+        console.log("No exact match for "+i+" (From class "+seg.type+") looking for the obj with the most matches without having any extras next")
+        return {type:seg.type, urn:obj_manifest.children[
+            obj_manifest.children.map((child, index) => {
+                return child.objectIds.reduce((acc, id) => {
+                    if(seg.ids.includes(id)){
+                        return [acc[0], acc[1]+1, acc[2]]
+                    }else{
+                        return [acc[0], acc[1], acc[2]+1]
+                    }
 
+                }, [index, 0,0])
+            }).reduce((acc, cur) => {
+                if(cur[2] == 0 && cur[1] > acc[1]){
+                    return cur
+                }else{
+                    return acc
+                }
+            })[0]
+            ].urn}
+        //throw("no obj file for these ids: "+JSON.stringify(cat))
     })
 
     /* Freeing this*/
@@ -193,36 +207,60 @@ router.get('/extract', async (req, res, next) => {
         return out_faces
     })
 
-    obj_files = await Promise.all(
-        obj_file_urns.map((urn) => {
-            if(urn){
-                return request_promise(
-                    {
-                        url:"https://developer.api.autodesk.com/derivativeservice/v2/derivatives/"+urn.split('/').map(x => encodeURIComponent(x)).join('/'),
-                        headers:auth_header
-                    })
-                    .then(async (value) => (obj_file_strip(new OBJFile(value).parse())))
-            }else{
-                return urn
-            }
-            }))
-    res.send(
-        handle_obj_file(obj_files)
+    var output = obj_file_urns.reduce((async (space, cur, cur_index, arr) => {
+            var obj_file = await request_promise(
+                                {
+                                    url:"https://developer.api.autodesk.com/derivativeservice/v2/derivatives/"+cur.urn.split('/').map(x => encodeURIComponent(x)).join('/'),
+                                    headers:auth_header
+                                }).then(async (value) => (obj_file_strip(new OBJFile(value).parse())))
+            var true_space = await space
+            process.stdout.write("\nWorking... "+(cur_index+1)+"/"+arr.length+" ")
+            return handle_obj_file(true_space, obj_file, cur.type)
+        })
+        , {cell_size:[0.25, 0.25, 0.25], max_type:obj_file_urns.slice(-1)[0].type}
     )
+
+    res.send(await output)
+    console.log("\nDone!")
 })
 
 
 
-function handle_obj_file(obj_list){
-    const cell_size = [0.25, 0.25, 0.25]
-    const cell_half_size = cell_size.map(c => c/2)
+function handle_obj_file(space, obj_file, type){
 
 
-    const x_to_cell = (x => Math.floor(x/cell_size[0]))
-    const y_to_cell = (y => Math.floor(y/cell_size[1]))
-    const z_to_cell = (z => Math.floor(z/cell_size[2]))
+    //console.log('%%%%%%%%%%%%%%%%%%%%')
+    //console.log("type: "+type)
+    //console.log("face count: "+obj_file.length)
+    //console.log("")
+    //console.log(space)
+    //console.log("")
+    process.stdout.write("#")
+    const cell_half_size = space.cell_size.map(c => c/2)
+    //helper functions
+    const space_trunk = ((v) =>
+        [
+            Math.floor(v[0]/space.cell_size[0]),
+            Math.floor(v[1]/space.cell_size[1]),
+            Math.floor(v[2]/space.cell_size[2]),
+        ])
 
-    //First, make bounding box
+    const space_to_cell = ((v) => {
+        let trunc = space_trunk(v)
+        return [
+            trunc[0]+space.offset[0],
+            trunc[1]+space.offset[1],
+            trunc[2]+space.offset[2]
+            ]
+    })
+
+    const space_to_cell_center = ((c) => [
+        (c[0]-space.offset[0]+0.5)*space.cell_size[0],
+        (c[1]-space.offset[1]+0.5)*space.cell_size[1],
+        (c[2]-space.offset[2]+0.5)*space.cell_size[2]
+    ])
+
+    // find bounding box
     var max_x = -Infinity
     var max_y = -Infinity
     var max_z = -Infinity
@@ -231,9 +269,8 @@ function handle_obj_file(obj_list){
     var min_y = Infinity
     var min_z = Infinity
 
-    //console.log(obj_list[0])
-
-    obj_list.filter(obj => obj).forEach(obj => obj.forEach(face => face.forEach(vert => {
+    obj_file.forEach(
+        (face) => {face.map(vert => space_trunk(vert)).forEach((vert) => {
         max_x = Math.max(vert[0], max_x)
         max_y = Math.max(vert[1], max_y)
         max_z = Math.max(vert[2], max_z)
@@ -241,62 +278,121 @@ function handle_obj_file(obj_list){
         min_x = Math.min(vert[0], min_x)
         min_y = Math.min(vert[1], min_y)
         min_z = Math.min(vert[2], min_z)
-    })))
+    })})
 
-    console.log("^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+    //console.log("^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
 
-    const x_off = -x_to_cell(min_x)+2
-    const y_off = -y_to_cell(min_y)+2
-    const z_off = -z_to_cell(min_z)+2
+    process.stdout.write("#")
 
-    const to_x = (x => x_to_cell(x)+x_off)
-    const to_y = (y => y_to_cell(y)+y_off)
-    const to_z = (z => z_to_cell(z)+z_off)
-
-    //to the middle of the pocket of space that maps to this cell
-    const from_x = (x_cell => (x_cell-x_off+0.5)*cell_size[0])
-    const from_y = (y_cell => (y_cell-y_off+0.5)*cell_size[1])
-    const from_z = (z_cell => (z_cell-z_off+0.5)*cell_size[2])
-
-    const x_len = to_x(max_x)+2
-    const y_len = to_y(max_y)+2
-    const z_len = to_z(max_z)+2
-
-    console.log([x_len, y_len, z_len])
-    //is wall, flooded by wall, is door, flooded by door, is window, flooded by window
-    var space = []
-    for(var i = 0; i<x_len; i++){
-        space.push([])
-        for(var j = 0; j<y_len; j++){
-            space[i].push(Array.apply(null, Array(z_len)).map(Number.prototype.valueOf,0))
+    if(!space.offset){
+        //first run, set up the cells
+        space.min    = [min_x, min_y, min_z]
+        space.max    = [max_x, max_y, max_z]
+        space.offset = [1-space.min[0], 1-space.min[1], 1-space.min[2]] /* the vector from the true position to the position in space.cells  */
+        space.len    = [space.max[0]-space.min[0]+2,
+                        space.max[1]-space.min[1]+2,
+                        space.max[2]-space.min[2]+2]
+        space.cells = []
+        for(var x = 0; x<space.len[0]; x++){
+            space.cells.push([])
+            for(var y = 0; y<space.len[1]; y++){
+                space.cells[x].push(Array.apply(null, Array(space.len[2])).map(Number.prototype.valueOf,0))
+            }
         }
-    }
-
-    for(index in obj_list){
-        if(obj_list[index]){
-            console.log(index)
-            //console.log(JSON.stringify(obj_list[index]))
-            obj_list[index].forEach((face) => {
-                min_x = Math.min(face[0][0], face[1][0], face[2][0])
-                min_y = Math.min(face[0][1], face[1][1], face[2][1])
-                min_z = Math.min(face[0][2], face[1][2], face[2][2])
-
-                max_x = Math.max(face[0][0], face[1][0], face[2][0])
-                max_y = Math.max(face[0][1], face[1][1], face[2][1])
-                max_z = Math.max(face[0][2], face[1][2], face[2][2])
-
-                for(var x = to_x(min_x)-1; x < to_x(max_x)+2; x++){
-                    for(var y = to_y(min_y)-1; y < to_y(max_y)+2; y++){
-                        for(var z = to_z(min_z)-1; z < to_z(max_z)+2; z++){
-                            space[x][y][z] |= (+triBoxOverlap([from_x(x), from_y(y), from_z(z)], cell_half_size, face))<<index
-                        }
-                    }
+    }else{
+        //not first run, mix in
+        //first x
+        if(min_x < space.min[0]){
+            for(var x = 0; x<space.min[0]-min_x; x++){
+                let arr = []
+                space.cells.unshift(arr)
+                for(var y = 0; y<space.len[1]; y++){
+                    arr.push(Array.apply(null, Array(space.len[2])).map(Number.prototype.valueOf,0))
                 }
-            })
+            }
         }
+
+        if(max_x > space.max[0]){
+            for(var x = 0; x<max_x-space.max[0]; x++){
+                let arr = []
+                space.cells.push(arr)
+                for(var y = 0; y<space.len[1]; y++){
+                    arr.push(Array.apply(null, Array(space.len[2])).map(Number.prototype.valueOf,0))
+                }
+            }
+        }
+
+        //then y
+        if(min_y < space.min[1]){
+            for(var x in space.cells){
+                for(var y = 0; y<space.min[1]-min_y; y++ ){
+                    space.cells[x].unshift(Array.apply(null, Array(space.len[2])).map(Number.prototype.valueOf,0))
+                }
+            }
+        }
+        if(max_y > space.max[1]){
+            for(var x in space.cells){
+                for(var y = 0; y<max_y-space.max[1]; y++ ){
+                    space.cells[x].push(Array.apply(null, Array(space.len[2])).map(Number.prototype.valueOf,0))
+                }
+            }
+        }
+
+        //then z
+        if(min_z < space.min[2]){
+            for(var x in space.cells){
+                for(var y in space.cells[x]){
+                    space.cells[x][y].unshift(...Array.apply(null, Array(space.min[2]-min_z)).map(Number.prototype.valueOf,0))
+                }
+            }
+        }
+        if(max_z > space.max[2]){
+            for(var x in space.cells){
+                for(var y in space.cells[x]){
+                    space.cells[x][y].push(...Array.apply(null, Array(max_z-space.max[2])).map(Number.prototype.valueOf,0))
+                }
+            }
+        }
+
+        space.min    = [
+            Math.min(space.min[0], min_x),
+            Math.min(space.min[1], min_y),
+            Math.min(space.min[2], min_z)]
+        space.max    = [
+            Math.max(space.max[0], max_x),
+            Math.max(space.max[1], max_y),
+            Math.max(space.max[2], max_z)]
+        space.offset = [1-space.min[0], 1-space.min[1], 1-space.min[2]] /* the vector from the true position to the position in space.cells  */
+        space.len    = [space.max[0]-space.min[0]+2,
+                        space.max[1]-space.min[1]+2,
+                        space.max[2]-space.min[2]+2]
     }
 
-    return {offset:[x_off, y_off, z_off], space:space}
+
+    process.stdout.write("#")
+    //console.log(JSON.stringify(obj_list[index]))
+    obj_file.forEach((face) => {
+        c_face = face.map(vert => space_to_cell(vert))
+        min_x = Math.min(c_face[0][0], c_face[1][0], c_face[2][0])
+        min_y = Math.min(c_face[0][1], c_face[1][1], c_face[2][1])
+        min_z = Math.min(c_face[0][2], c_face[1][2], c_face[2][2])
+
+        max_x = Math.max(c_face[0][0], c_face[1][0], c_face[2][0])
+        max_y = Math.max(c_face[0][1], c_face[1][1], c_face[2][1])
+        max_z = Math.max(c_face[0][2], c_face[1][2], c_face[2][2])
+
+        for(var x = min_x; x<= max_x; x++){
+            for(var y = min_y; y<= max_y; y++){
+                for(var z = min_z; z<= max_z; z++){
+                    space.cells[x][y][z] |= (+triBoxOverlap(space_to_cell_center([x,y,z]), cell_half_size, face))<<type
+                }
+            }
+        }
+    })
+
+    process.stdout.write("#")
+
+    return space
 }
 function planeBoxOverlap(normal, vert, maxbox) {
   var vmin = [0,0,0]

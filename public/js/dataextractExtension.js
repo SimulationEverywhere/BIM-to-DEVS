@@ -169,8 +169,7 @@ class DataExtractExtension extends Autodesk.Viewing.Extension {
              }
          }
          //console.log(intersectionData);
-         var dataStr = JSON.stringify(intersectionData).replace(/\"([^(\")"]+)\":/g,"$1:");
-         DataExtractExtension.download(dataStr, "config.json", "application/json");
+         DataExtractExtension.download(JSON.stringify(intersectionData), "config.json", "application/json");
          context.putImageData(data, 0, 0);
          canvas.style.position = 'absolute';
          canvas.style.zIndex = 100;

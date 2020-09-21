@@ -266,7 +266,7 @@ function handle_obj_file(obj_list, ids){
                     for(var x = to_x(min_x)-1; x < to_x(max_x)+2; x++){
                         for(var y = to_y(min_y)-1; y < to_y(max_y)+2; y++){
                             for(var z = to_z(min_z)-1; z < to_z(max_z)+2; z++){
-                                space[x][y][z][index] |= triBoxOverlap([from_x(x), from_y(y), from_z(z)], cell_half_size, verts)
+                                space[x][y][z] |= (+triBoxOverlap([from_x(x), from_y(y), from_z(z)], cell_half_size, verts))<<index
                             }
                         }
                     }

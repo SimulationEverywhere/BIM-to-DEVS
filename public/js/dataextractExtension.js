@@ -145,13 +145,13 @@ class DataExtractExtension extends Autodesk.Viewing.Extension {
             results.space.forEach((sub_space, x) => {
                 sub_space.forEach((sub_sub_space, y) => {
                     var val = sub_sub_space[z]
-                    if(val[2]){
+                    if(val & 1<<2){
                         //door
                         ctx.fillStyle = "rgb(0, 255, 0)"
-                    }else if(val[1]){
+                    }else if(val  & 1<<1){
                         //window
                         ctx.fillStyle = "rgb(255, 0, 0)"
-                    }else if(val[0]){
+                    }else if(val  & 1<<0){
                         //wall
                         ctx.fillStyle = "rgb(0, 0, 0)"
                     }else{

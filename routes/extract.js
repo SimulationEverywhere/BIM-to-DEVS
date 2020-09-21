@@ -164,6 +164,19 @@ router.get('/extract', async (req, res, next) => {
     console.log("obj file urns")
     console.log(obj_file_urns)
 
+    const obj_file_strip = ((objf) => {
+        out_faces = []
+        objf.models.forEach((model) => {
+            model.faces.forEach((face) => {
+                out_faces.push(face.vertices.map((vert) => {
+                    let v = model.vertices[vert.vertexIndex-1]
+                    return [v.x, v.y, v.z]
+                }))
+            })
+        })
+        return out_faces
+    })
+
     obj_files = await Promise.all(
         obj_file_urns.map((urn) => {
             if(urn){
@@ -172,19 +185,18 @@ router.get('/extract', async (req, res, next) => {
                         url:"https://developer.api.autodesk.com/derivativeservice/v2/derivatives/"+urn.split('/').map(x => encodeURIComponent(x)).join('/'),
                         headers:auth_header
                     })
-                    .then(async (value) => (new OBJFile(value).parse()))
+                    .then(async (value) => (obj_file_strip(new OBJFile(value).parse())))
             }else{
                 return urn
             }
             }))
-    console.log(obj_files)
     res.send(
-        handle_obj_file(obj_files, cats)
+        handle_obj_file(obj_files)
     )
 })
 
 
-function handle_obj_file(obj_list, ids){
+function handle_obj_file(obj_list){
     const cell_size = [0.25, 0.25, 0.25]
     const cell_half_size = cell_size.map(c => c/2)
 
@@ -202,14 +214,16 @@ function handle_obj_file(obj_list, ids){
     var min_y = Infinity
     var min_z = Infinity
 
-    obj_list.filter(obj => obj).forEach(obj => obj.models.forEach(model => model.vertices.forEach(vert => {
-        max_x = Math.max(vert.x, max_x)
-        max_y = Math.max(vert.y, max_y)
-        max_z = Math.max(vert.z, max_z)
+    //console.log(obj_list[0])
 
-        min_x = Math.min(vert.x, min_x)
-        min_y = Math.min(vert.y, min_y)
-        min_z = Math.min(vert.z, min_z)
+    obj_list.filter(obj => obj).forEach(obj => obj.forEach(face => face.forEach(vert => {
+        max_x = Math.max(vert[0], max_x)
+        max_y = Math.max(vert[1], max_y)
+        max_z = Math.max(vert[2], max_z)
+
+        min_x = Math.min(vert[0], min_x)
+        min_y = Math.min(vert[1], min_y)
+        min_z = Math.min(vert[2], min_z)
     })))
 
     console.log("^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
@@ -237,11 +251,7 @@ function handle_obj_file(obj_list, ids){
     for(var i = 0; i<x_len; i++){
         space.push([])
         for(var j = 0; j<y_len; j++){
-            space[i].push([])
-            for(var k = 0; k<z_len; k++){
-                space[i][j].push([])
-                obj_list.forEach(_ => space[i][j][k].push(0))
-            }
+            space[i].push(Array.apply(null, Array(z_len)).map(Number.prototype.valueOf,0))
         }
     }
 
@@ -249,33 +259,27 @@ function handle_obj_file(obj_list, ids){
         if(obj_list[index]){
             console.log(index)
             //console.log(JSON.stringify(obj_list[index]))
-            obj_list[index].models.forEach((model) => {
-                model.faces.forEach((face) => {
-                    verts = face.vertices.map((vert) => {
-                        let v = model.vertices[vert.vertexIndex-1]
-                        return [v.x, v.y, v.z]
-                        })
-                    min_x = Math.min(verts[0][0], verts[1][0], verts[2][0])
-                    min_y = Math.min(verts[0][1], verts[1][1], verts[2][1])
-                    min_z = Math.min(verts[0][2], verts[1][2], verts[2][2])
+            obj_list[index].forEach((face) => {
+                min_x = Math.min(face[0][0], face[1][0], face[2][0])
+                min_y = Math.min(face[0][1], face[1][1], face[2][1])
+                min_z = Math.min(face[0][2], face[1][2], face[2][2])
 
-                    max_x = Math.max(verts[0][0], verts[1][0], verts[2][0])
-                    max_y = Math.max(verts[0][1], verts[1][1], verts[2][1])
-                    max_z = Math.max(verts[0][2], verts[1][2], verts[2][2])
+                max_x = Math.max(face[0][0], face[1][0], face[2][0])
+                max_y = Math.max(face[0][1], face[1][1], face[2][1])
+                max_z = Math.max(face[0][2], face[1][2], face[2][2])
 
-                    for(var x = to_x(min_x)-1; x < to_x(max_x)+2; x++){
-                        for(var y = to_y(min_y)-1; y < to_y(max_y)+2; y++){
-                            for(var z = to_z(min_z)-1; z < to_z(max_z)+2; z++){
-                                space[x][y][z] |= (+triBoxOverlap([from_x(x), from_y(y), from_z(z)], cell_half_size, verts))<<index
-                            }
+                for(var x = to_x(min_x)-1; x < to_x(max_x)+2; x++){
+                    for(var y = to_y(min_y)-1; y < to_y(max_y)+2; y++){
+                        for(var z = to_z(min_z)-1; z < to_z(max_z)+2; z++){
+                            space[x][y][z] |= (+triBoxOverlap([from_x(x), from_y(y), from_z(z)], cell_half_size, face))<<index
                         }
                     }
-                })
+                }
             })
         }
     }
 
-    return {offset:[x_off, y_off, z_off], space:space, ids:ids}
+    return {offset:[x_off, y_off, z_off], space:space}
 }
 function planeBoxOverlap(normal, vert, maxbox) {
   var vmin = [0,0,0]

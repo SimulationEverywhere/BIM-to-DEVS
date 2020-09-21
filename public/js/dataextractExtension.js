@@ -54,8 +54,28 @@ class DataExtractExtension extends Autodesk.Viewing.Extension {
 
 
     async extractObjDict(ids){
-        let catagories = ["Revit Walls", "Revit Windows"]
+        let catagories = []
         let sql_queries = [
+                        `SELECT DISTINCT
+                        	entity_id AS id
+                        FROM
+                        	_objects_eav
+                        	LEFT OUTER JOIN _objects_id ON _objects_eav.entity_id = _objects_id.id
+                        	LEFT OUTER JOIN _objects_attr ON _objects_eav.attribute_id = _objects_attr.id
+                        	LEFT OUTER JOIN _objects_val ON _objects_eav.value_id = _objects_val.id
+                        WHERE
+                        	category == "__category__" AND
+                        	value    == "Revit Walls";`.replace(/\s+/g, ' '),
+                        `SELECT DISTINCT
+                        	entity_id AS id
+                        FROM
+                        	_objects_eav
+                        	LEFT OUTER JOIN _objects_id ON _objects_eav.entity_id = _objects_id.id
+                        	LEFT OUTER JOIN _objects_attr ON _objects_eav.attribute_id = _objects_attr.id
+                        	LEFT OUTER JOIN _objects_val ON _objects_eav.value_id = _objects_val.id
+                        WHERE
+                        	category == "__category__" AND
+                        	value    == "Revit Windows";`.replace(/\s+/g, ' '),
                         `SELECT DISTINCT
                         	entity_id AS id
                         FROM
@@ -69,6 +89,9 @@ class DataExtractExtension extends Autodesk.Viewing.Extension {
                     ]
 
         const filter_object_ids = async (ids, catagories) => {
+            if(catagories.length == 0){
+                return []
+            }
             const getBulkPropertiesPromise = (...args) => {
                 return new Promise((resolve, reject) => {
                     viewer.model.getBulkProperties(...args, (data) => {

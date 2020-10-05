@@ -1,4 +1,4 @@
-const { OAuth } = require('./common/oauth')
+const {OAuth} = require('./common/oauth')
 const express = require('express')
 const request = require('request')
 const request_promise = require('request-promise')
@@ -8,7 +8,8 @@ const path = require('path')
 const sqlite = require('sqlite-async')
 const readline = require('readline')
 const OBJFile = require('obj-file-parser')
-const colors = require('colors')
+const util = require("util");
+const fsp = fs.promises
 
 
 const catchall = function(x) {
@@ -19,162 +20,246 @@ const catchall = function(x) {
 }
 
 let router = express.Router();
-/*
-const query_prototype = {
-    urn: "",//The client give this to us
-    view_name: "3D",
-    default_state:{"counter": -1, "concentration": 500, "type": -100},
-    parts : [
-        {
-            name : "walls",
-            state: {"concentration": 500, "type": -300, "counter": -1},
-            sql  : ('SELECT DISTINCT '+
-                    '    _objects_id.id AS id '+
-                    'FROM '+
-                    '    _objects_attr '+
-                    '     INNER JOIN _objects_eav ON _objects_eav.attribute_id = _objects_attr.id '+
-                    '     LEFT OUTER JOIN _objects_val ON _objects_eav.value_id = _objects_val.id '+
-                    '     LEFT OUTER JOIN _objects_id ON _objects_eav.entity_id = _objects_id.id '+
-                    'WHERE '+
-                    '     _objects_attr.category = "Category" AND (_objects_val.value = "Revit Walls" OR _objects_val.value = "Revit Floors" OR _objects_val.value = "Revit Roofs");'),
-        },{
-            name : "windows",
-            state: {"concentration": 500, "type": -500, "counter": -1},
-            sql  : ('SELECT DISTINCT '+
-                    '    _objects_id.id AS id '+
-                    'FROM '+
-                    '    _objects_attr '+
-                    '     INNER JOIN _objects_eav ON _objects_eav.attribute_id = _objects_attr.id '+
-                    '     LEFT OUTER JOIN _objects_val ON _objects_eav.value_id = _objects_val.id '+
-                    '     LEFT OUTER JOIN _objects_id ON _objects_eav.entity_id = _objects_id.id '+
-                    'WHERE '+
-                    '     _objects_attr.category = "Category" AND _objects_val.value = "Revit Windows";'),
-        },{
-            name : "doors",
-            state: {"concentration": 500, "type": -400, "counter": -1},
-            sql  : ('SELECT DISTINCT '+
-                    '    _objects_id.id AS id '+
-                    'FROM '+
-                    '    _objects_attr '+
-                    '     INNER JOIN _objects_eav ON _objects_eav.attribute_id = _objects_attr.id '+
-                    '     LEFT OUTER JOIN _objects_val ON _objects_eav.value_id = _objects_val.id '+
-                    '     LEFT OUTER JOIN _objects_id ON _objects_eav.entity_id = _objects_id.id '+
-                    'WHERE '+
-                    '     _objects_attr.category = "Category" AND _objects_val.value = "Revit Doors";'),
-        }
-    ]
-}
 
-*/
 router.get('/extract', async (req, res, next) => {
-    const query = req.query;
+    const query = req.query
+    var   cats  = []
+    if(query.catagories){
+        cats = JSON.parse(query.catagories)
+    }
     const urn = query.urn
     const oauth = new OAuth(req.session)
     const internalToken = await oauth.getInternalToken()
+    //const internalToken = await OAuth.getInternalToken()
     const auth_header = {'Authorization':'Bearer '+internalToken.access_token}
 
-    request({url:"https://developer.api.autodesk.com/modelderivative/v2/designdata/"+urn+"/metadata", headers:auth_header}, (error, responce, body) => { if(error) throw(error);
-        console.log(urn)
-        console.log(body)
-        var view_metadata = JSON.parse(body).data.metadata.find(x => x.name.includes(query.view_name || "3D"))
-        if(!view_metadata) throw("Metadata with "+view_name+"not found, did you want "+JSON.stringify(JSON.parse(body).data.metadata)  );
-        var guid = view_metadata.guid
-        //console.log(guid)
-        var t_url = "https://developer.api.autodesk.com/derivativeservice/v2/derivatives/"+encodeURIComponent("urn:adsk.viewing:fs.file:"+urn)+"/output/Resource/model.sdb"
-        //console.log(t_url)
-        request({url:t_url, headers:auth_header, encoding:null}, (error, response, body) => { if (error) throw(error);
-            fs.mkdtemp(path.join(os.tmpdir(), urn+"-"), (err, directory) => { if(err) throw err;
-                var db_path = path.join(directory, "model.sdb")
-                fs.writeFile(db_path, body, async (err) => {if (err) throw err;
+    console.log("urn: "+urn)
+    var designdata_metadata = JSON.parse(await request_promise({url:"https://developer.api.autodesk.com/modelderivative/v2/designdata/"+urn+"/metadata", headers:auth_header}))
+    var view_metadata = designdata_metadata.data.metadata.find(x => x.name.includes(query.view_name || "3D"))
 
-                    let db = await sqlite.open(db_path, sqlite.OPEN_READONLY);
-                    var part_ids_promices = query.parts.map((part) => db.all(part.sql, []).then(x => x.map(y => y.id)))
-                    var part_ids = []
-                    await Promise.all(part_ids_promices.map(async (part_promice, index) => {
-                        part_ids[index] = await part_promice
-                        return request_promise.post(
-                                {
-                                    url:"https://developer.api.autodesk.com/modelderivative/v2/designdata/job",
-                                    body:JSON.stringify(
-                                        {
-                                            input:{"urn":urn},
-                                            output:{
-                                                destination:{region:"us"},
-                                                formats: [
-                                                    {
-                                                        type: "obj",
-                                                        advanced: {
-                                                            unit:"meter",
-                                                            modelGuid:guid,
-                                                            objectIds: part_ids[index]
-                                                        }
-                                                    }
-                                                ]
-                                            }
-                                        }
-                                    ),
-                                    headers:Object.assign({}, auth_header, {"Content-Type":"application/json; charset=utf-8"})
-                                })
-                                }))
+    if(!view_metadata) throw("Metadata with "+view_name+"not found, did you want "+JSON.stringify(designdata_metadata.data.metadata)  );
 
+    /* Freeing this*/
+    designdata_metadata = null
 
-                    var options = {url:"https://developer.api.autodesk.com/modelderivative/v2/designdata/"+urn+"/manifest", headers:auth_header}
-                    var manifest_body = null
-                    while(!manifest_body || ["inprogress","pending"].includes(JSON.parse(manifest_body).status)){
-                        if(manifest_body){console.log(JSON.parse(manifest_body).status)}
-                        manifest_body = await request_promise(options).catch(catchall)
+    var guid = view_metadata.guid
+
+    /* Freeing this*/
+    view_metadata = null
+
+    //If there are sql query strings in the request, add the ids that they select for in order to the end of the list of catagories
+    if(query.sql && query.sql.length){
+        let db_url = "https://developer.api.autodesk.com/derivativeservice/v2/derivatives/"+encodeURIComponent("urn:adsk.viewing:fs.file:"+urn)+"/output/Resource/model.sdb"
+        let db_blob_p = request_promise({url:db_url, headers:auth_header, encoding:null})
+        let db_path = path.join((await (fsp.mkdtemp(path.join(os.tmpdir(), urn+"-")))), "mode.sdb")
+        await fsp.writeFile(db_path, (await db_blob_p))
+        let db = await sqlite.open(db_path, sqlite.OPEN_READONLY)
+        let qp = (await Promise.all(query.sql.map(async (part) => {
+            return await db.all(part).then(x => x.map(y => y.id))
+        }))).forEach(part => cats.push(part))
+        db.close()
+    }
+
+    console.log("id lists:")
+    console.log(cats)
+
+    //Breake up the catagories into managable lumps
+    const segment_size = 200
+    var segments = cats.map((cat) => {
+            if(cat){
+                var arr = []
+                for(var index = 0; index*segment_size < cat.length; index++){
+                    arr.push(cat.slice(index*segment_size, (index+1)*segment_size))
+                }
+                return arr
+            }else{
+                return []
+            }
+        }).reduce((acc, cur, index)=> {
+            cur.forEach(s => acc.push({type:index, ids:s}))
+            return acc
+        }, [])
+
+    //
+    const post_retry_on_fail = async(options, max_retries = 5) => {
+        request_promise.post(options).catch((x)=>{
+            if(max_retries > 0){
+                return post_retry_on_fail(options, max_retries-1)
+            }else{
+                return catchall(x)
+            }
+        })
+    }
+
+    console.log("split catagories into "+segments.length+" segments")
+
+    //Send off the jobs
+    await Promise.all(segments.map(async (seg) => {
+        return await post_retry_on_fail({
+            url:"https://developer.api.autodesk.com/modelderivative/v2/designdata/job",
+            body:JSON.stringify(
+                {
+                    input:{"urn":urn},
+                    output:{
+                        destination:{region:"us"},
+                        formats: [
+                            {
+                                type: "obj",
+                                advanced: {
+                                    unit:"meter",
+                                    modelGuid:guid,
+                                    objectIds:seg.ids
+                                }
+                            }
+                        ]
                     }
-                    console.log()
-                    console.log(manifest_body)
-                    console.log()
+                }
+            ),
+            headers:Object.assign({}, auth_header, {"Content-Type":"application/json; charset=utf-8"})
+        })
+    }))
 
-                    var obj_manifest = JSON.parse(manifest_body).derivatives.find(x => (x.outputType && x.outputType === "obj"))
-                    if(!obj_manifest) throw("There is no obj file, try again?");
+    let options = {url:"https://developer.api.autodesk.com/modelderivative/v2/designdata/"+urn+"/manifest", headers:auth_header}
+    let manifest_body = null
+    while(!manifest_body || ["inprogress","pending"].includes(JSON.parse(manifest_body).status)){
+        if(manifest_body){console.log(JSON.parse(manifest_body).status)}
+        manifest_body = await request_promise(options).catch(catchall)
+    }
+    let derivatives = JSON.parse(manifest_body).derivatives
+    //console.log()
+    //console.log(JSON.parse(manifest_body))
+    //console.log()
 
-                    var part_manifests = part_ids.map(ids => obj_manifest.children.find(x => (x.objectIds && x.objectIds.every(y => ids.includes(y)))))
+    /* Freeing this*/
+    manifest_body = null
 
-                    if(!part_manifests.every(x => x)) throw("There is no obj file, try again?");
+    const set_identity = ((l1, l2) => {
+        l1 = l1.filter((v,i,arr) => arr.indexOf(v) === i)
+        l2 = l2.filter((v,i,arr) => arr.indexOf(v) === i)
+        if(l1.length !== l2.length) {
+            return false
+        }else{
+            l1.sort((a,b)=>a-b)
+            l2.sort((a,b)=>a-b)
+            for(var i = 0; i<l1.length; i++){
+                if(l1[i] !== l2[i]){
+                    return false
+                }
+            }
+            return true
+        }
+    })
 
-                    part_manifests.forEach(x => console.log("\n"+JSON.stringify(x)))
-                    console.log()
+    //console.log(derivatives)
+    let obj_manifest = derivatives.find(x => (x.outputType && x.outputType === "obj"))
+    if(!obj_manifest) throw("There are no obj files, try again?");
 
-                    obj_files = await Promise.all(part_manifests.map(m => request_promise({url:"https://developer.api.autodesk.com/derivativeservice/v2/derivatives/"+m.urn.split('/').map(x => encodeURIComponent(x)).join('/'), headers:auth_header})
-                                                                .then(async (value) => (new OBJFile(value).parse()))
-                                                                ))
+    /* Freeing this*/
+    derivatives = null
 
+    //console.log(obj_manifest)
 
-                    res.send(
-                        handle_obj_file(query, obj_files)
-                    )
+    let obj_file_urns = segments.map((seg, i) => {
+        for(index in obj_manifest.children){
+            if(set_identity(obj_manifest.children[index].objectIds, seg.ids)){
+                return {type:seg.type, urn:obj_manifest.children[index].urn}
+            }
+        }
+        console.log("No exact match for "+i+" (From class "+seg.type+") looking for the obj with the most matches without having any extras next")
+        return {type:seg.type, urn:obj_manifest.children[
+            obj_manifest.children.map((child, index) => {
+                return child.objectIds.reduce((acc, id) => {
+                    if(seg.ids.includes(id)){
+                        return [acc[0], acc[1]+1, acc[2]]
+                    }else{
+                        return [acc[0], acc[1], acc[2]+1]
+                    }
 
-                    db.close()
-                })
+                }, [index, 0,0])
+            }).reduce((acc, cur) => {
+                if(cur[2] == 0 && cur[1] > acc[1]){
+                    return cur
+                }else{
+                    return acc
+                }
+            })[0]
+            ].urn}
+        //throw("no obj file for these ids: "+JSON.stringify(cat))
+    })
+
+    /* Freeing this*/
+    obj_manifest = null
+
+    console.log("obj file urns")
+    console.log(obj_file_urns)
+
+    const obj_file_strip = ((objf) => {
+        out_faces = []
+        objf.models.forEach((model) => {
+            model.faces.forEach((face) => {
+                out_faces.push(face.vertices.map((vert) => {
+                    let v = model.vertices[vert.vertexIndex-1]
+                    return [v.x, v.y, v.z]
+                }))
             })
         })
+        return out_faces
     })
+
+    var output = obj_file_urns.reduce((async (space, cur, cur_index, arr) => {
+            var obj_file = await request_promise(
+                                {
+                                    url:"https://developer.api.autodesk.com/derivativeservice/v2/derivatives/"+cur.urn.split('/').map(x => encodeURIComponent(x)).join('/'),
+                                    headers:auth_header
+                                }).then(async (value) => (obj_file_strip(new OBJFile(value).parse())))
+            var true_space = await space
+            process.stdout.write("\nWorking... "+(cur_index+1)+"/"+arr.length+" ")
+            return handle_obj_file(true_space, obj_file, cur.type)
+        })
+        , {cell_size:[0.25, 0.25, 0.25], max_type:obj_file_urns.slice(-1)[0].type}
+    )
+
+    res.send(await output)
+    console.log("\nDone!")
 })
 
 
 
+function handle_obj_file(space, obj_file, type){
 
 
-function handle_obj_file(query, obj_list){
-    const cell_size = 0.25
-    const cell_reach = 0.1
+    //console.log('%%%%%%%%%%%%%%%%%%%%')
+    //console.log("type: "+type)
+    //console.log("face count: "+obj_file.length)
+    //console.log("")
+    //console.log(space)
+    //console.log("")
+    process.stdout.write("#")
+    const cell_half_size = space.cell_size.map(c => c/2)
+    //helper functions
+    const space_trunk = ((v) =>
+        [
+            Math.floor(v[0]/space.cell_size[0]),
+            Math.floor(v[1]/space.cell_size[1]),
+            Math.floor(v[2]/space.cell_size[2]),
+        ])
 
+    const space_to_cell = ((v) => {
+        let trunc = space_trunk(v)
+        return [
+            trunc[0]+space.offset[0],
+            trunc[1]+space.offset[1],
+            trunc[2]+space.offset[2]
+            ]
+    })
 
-    const to_cell = (x => Math.floor(x/cell_size))
+    const space_to_cell_center = ((c) => [
+        (c[0]-space.offset[0]+0.5)*space.cell_size[0],
+        (c[1]-space.offset[1]+0.5)*space.cell_size[1],
+        (c[2]-space.offset[2]+0.5)*space.cell_size[2]
+    ])
 
-    console.log("#############################")
-    //console.log()
-    //console.log(JSON.stringify(wall_obj))
-    //console.log()
-    //console.log(JSON.stringify(door_obj))
-    //console.log()
-    //console.log(JSON.stringify(window_obj))
-    //console.log()
-
-    //First, make bounding box
+    // find bounding box
     var max_x = -Infinity
     var max_y = -Infinity
     var max_z = -Infinity
@@ -183,238 +268,387 @@ function handle_obj_file(query, obj_list){
     var min_y = Infinity
     var min_z = Infinity
 
-    console.log("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+    obj_file.forEach(
+        (face) => {face.map(vert => space_trunk(vert)).forEach((vert) => {
+        max_x = Math.max(vert[0], max_x)
+        max_y = Math.max(vert[1], max_y)
+        max_z = Math.max(vert[2], max_z)
 
-    obj_list.forEach(obj => obj.models.forEach(model => model.vertices.forEach(vert => {
-        max_x = Math.max(vert.x, max_x)
-        max_y = Math.max(vert.y, max_y)
-        max_z = Math.max(vert.z, max_z)
+        min_x = Math.min(vert[0], min_x)
+        min_y = Math.min(vert[1], min_y)
+        min_z = Math.min(vert[2], min_z)
+    })})
 
-        min_x = Math.min(vert.x, min_x)
-        min_y = Math.min(vert.y, min_y)
-        min_z = Math.min(vert.z, min_z)
-    })))
+    //console.log("^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
 
-    console.log("^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+    process.stdout.write("#")
 
-    const x_off = -to_cell(min_x)+2
-    const y_off = -to_cell(min_y)+2
-    const z_off = -to_cell(min_z)+2
-
-    const to_x = (x => to_cell(x)+x_off)
-    const to_y = (y => to_cell(y)+y_off)
-    const to_z = (z => to_cell(z)+z_off)
-
-    //to the middle of the pocket of space that maps to this cell
-    const from_x = (x_cell => (x_cell-x_off+0.5)*cell_size)
-    const from_y = (y_cell => (y_cell-y_off+0.5)*cell_size)
-    const from_z = (z_cell => (z_cell-z_off+0.5)*cell_size)
-
-    const x_len = to_x(max_x)+2
-    const y_len = to_y(max_y)+2
-    const z_len = to_z(max_z)+2
-
-    console.log([x_len, y_len, z_len])
-    //is wall, flooded by wall, is door, flooded by door, is window, flooded by window
-    var space = []
-    for(var i = 0; i<x_len; i++){
-        space.push([])
-        for(var j = 0; j<y_len; j++){
-            space[i].push([])
-            for(var k = 0; k<z_len; k++){
-                space[i][j].push([])
-                query.parts.forEach(_ => space[i][j][k].push(false))
+    if(!space.offset){
+        //first run, set up the cells
+        space.min    = [min_x, min_y, min_z]
+        space.max    = [max_x, max_y, max_z]
+        space.offset = [1-space.min[0], 1-space.min[1], 1-space.min[2]] /* the vector from the true position to the position in space.cells  */
+        space.len    = [space.max[0]-space.min[0]+2,
+                        space.max[1]-space.min[1]+2,
+                        space.max[2]-space.min[2]+2]
+        space.cells = []
+        for(var x = 0; x<space.len[0]; x++){
+            space.cells.push([])
+            for(var y = 0; y<space.len[1]; y++){
+                space.cells[x].push(Array.apply(null, Array(space.len[2])).map(Number.prototype.valueOf,0))
             }
         }
+    }else{
+        //not first run, mix in
+        //first x
+        if(min_x < space.min[0]){
+            for(var x = 0; x<space.min[0]-min_x; x++){
+                let arr = []
+                space.cells.unshift(arr)
+                for(var y = 0; y<space.len[1]; y++){
+                    arr.push(Array.apply(null, Array(space.len[2])).map(Number.prototype.valueOf,0))
+                }
+            }
+        }
+
+        if(max_x > space.max[0]){
+            for(var x = 0; x<max_x-space.max[0]; x++){
+                let arr = []
+                space.cells.push(arr)
+                for(var y = 0; y<space.len[1]; y++){
+                    arr.push(Array.apply(null, Array(space.len[2])).map(Number.prototype.valueOf,0))
+                }
+            }
+        }
+
+        //then y
+        if(min_y < space.min[1]){
+            for(var x in space.cells){
+                for(var y = 0; y<space.min[1]-min_y; y++ ){
+                    space.cells[x].unshift(Array.apply(null, Array(space.len[2])).map(Number.prototype.valueOf,0))
+                }
+            }
+        }
+        if(max_y > space.max[1]){
+            for(var x in space.cells){
+                for(var y = 0; y<max_y-space.max[1]; y++ ){
+                    space.cells[x].push(Array.apply(null, Array(space.len[2])).map(Number.prototype.valueOf,0))
+                }
+            }
+        }
+
+        //then z
+        if(min_z < space.min[2]){
+            for(var x in space.cells){
+                for(var y in space.cells[x]){
+                    space.cells[x][y].unshift(...Array.apply(null, Array(space.min[2]-min_z)).map(Number.prototype.valueOf,0))
+                }
+            }
+        }
+        if(max_z > space.max[2]){
+            for(var x in space.cells){
+                for(var y in space.cells[x]){
+                    space.cells[x][y].push(...Array.apply(null, Array(max_z-space.max[2])).map(Number.prototype.valueOf,0))
+                }
+            }
+        }
+
+        space.min    = [
+            Math.min(space.min[0], min_x),
+            Math.min(space.min[1], min_y),
+            Math.min(space.min[2], min_z)]
+        space.max    = [
+            Math.max(space.max[0], max_x),
+            Math.max(space.max[1], max_y),
+            Math.max(space.max[2], max_z)]
+        space.offset = [1-space.min[0], 1-space.min[1], 1-space.min[2]] /* the vector from the true position to the position in space.cells  */
+        space.len    = [space.max[0]-space.min[0]+2,
+                        space.max[1]-space.min[1]+2,
+                        space.max[2]-space.min[2]+2]
     }
 
-    //console.log(JSON.stringify(space))
-    //console.log(space.length)
-    //console.log(space[0].length)
-    //console.log(space[0][0].length)
 
-    const vert_to_vec = (vert => [vert.x, vert.y, vert.z])
-    const norm_and_point_to_plain = ((norm, point) => ([norm[0], norm[1], norm[2], -norm[0]*point[0]-norm[1]*point[1]-norm[2]*point[2]]))
-    const point_and_plain_to_dist = ((point, plane) => (Math.abs(point[0]*plane[0]+point[1]*plane[1]+point[2]*plane[2]+plane[3])))
-    const add_vec = ((vec_a, vec_b) => [vec_a[0]+vec_b[0],vec_a[1]+vec_b[1],vec_a[2]+vec_b[2]])
-    const sub_vec = ((vec_a, vec_b) => [vec_a[0]-vec_b[0],vec_a[1]-vec_b[1],vec_a[2]-vec_b[2]])
-    const scale_vec = ((vec, sca) => [vec[0]*sca,vec[1]*sca,vec[2]*sca])
-    const dist_vec = ((vec_a, vec_b) => (len_vec(sub_vec(vec_a, vec_b))))
-    const neg_vec = ((vec) => [-vec[0],-vec[1],-vec[2]])
-    const cross_vec = ((vec_a, vec_b) => (
-        [(vec_a[2]*vec_b[3]-vec_a[3]*vec_b[2]),
-         (vec_a[3]*vec_b[1]-vec_a[1]*vec_b[3]),
-         (vec_a[1]*vec_b[2]-vec_a[2]*vec_b[1])]))
-    const dot_vec = ((vec_a, vec_b) => (vec_a[0]*vec_b[0]+vec_a[1]*vec_b[1]+vec_a[2]*vec_b[2]))
-    const len_vec = ((vec)=>(Math.sqrt(vec[0]*vec[0]+vec[1]*vec[1]+vec[2]*vec[2])))
-    const norm_vec = ((vec) => {len = len_vec(vec);return [vec[0]/len,vec[1]/len,vec[2]/len]})
+    process.stdout.write("#")
+    //console.log(JSON.stringify(obj_list[index]))
+    obj_file.forEach((face) => {
+        c_face = face.map(vert => space_to_cell(vert))
+        min_x = Math.min(c_face[0][0], c_face[1][0], c_face[2][0])
+        min_y = Math.min(c_face[0][1], c_face[1][1], c_face[2][1])
+        min_z = Math.min(c_face[0][2], c_face[1][2], c_face[2][2])
 
-    const same_side = ((p_a, p_b, p_in, p_q) =>(
-        dot_vec(
-            cross_vec(sub_vec(p_a, p_b), sub_vec(p_a, p_in)),
-            cross_vec(sub_vec(p_a, p_b), sub_vec(p_a, p_q))
-            ) > 0))
+        max_x = Math.max(c_face[0][0], c_face[1][0], c_face[2][0])
+        max_y = Math.max(c_face[0][1], c_face[1][1], c_face[2][1])
+        max_z = Math.max(c_face[0][2], c_face[1][2], c_face[2][2])
 
-    const line_and_point_to_dist = ((l0, l1, point) => {
-        var norm_line = norm_vec(sub_vec(l1, l0))
-        return dist_vec(add_vec(l0, scale_vec(dot_vec(sub_vec(point, l0), norm_line), norm_line)), point)
-    })
-
-    const fill_tri = ((vert0, vert1, vert2, bit, cell_reach) => {
-
-        let vec_a = vert_to_vec(vert0)
-        let vec_b = vert_to_vec(vert1)
-        let vec_c = vert_to_vec(vert2)
-
-        let vec_ab = sub_vec(vec_b, vec_a)
-        let vec_bc = sub_vec(vec_c, vec_b)
-        let vec_ca = sub_vec(vec_a, vec_c)
-
-        let max_x = Math.max(vec_a[0],vec_b[0],vec_c[0])+cell_reach
-        let max_y = Math.max(vec_a[1],vec_b[1],vec_c[1])+cell_reach
-        let max_z = Math.max(vec_a[2],vec_b[2],vec_c[2])+cell_reach
-
-        let min_x = Math.min(vec_a[0],vec_b[0],vec_c[0])-cell_reach
-        let min_y = Math.min(vec_a[1],vec_b[1],vec_c[1])-cell_reach
-        let min_z = Math.min(vec_a[2],vec_b[2],vec_c[2])-cell_reach
-
-        //perhaps use the max of the 3 cross products?
-        let plane = norm_and_point_to_plain(norm_vec(cross_vec(vec_ab, vec_bc)), vec_a)
-
-        for(var x = Math.max(0, to_x(min_x)); x <= Math.min(x_len-1, to_x(max_x)); x++){
-            for(var y = Math.max(0, to_y(min_y)); y <= Math.min(y_len-1, to_y(max_y)); y++){
-                for(var z = Math.max(0, to_z(min_z)); z <= Math.min(z_len-1, to_z(max_z)); z++){
-                    var vec_p = [from_x(x), from_y(y), from_z(z)]
-                    var dist_to_plane = point_and_plain_to_dist(vec_p, plane)
-                    var closest_point = add_vec(vec_p, scale_vec(plane, dist_to_plane))
-                    space[x][y][z][bit] |= !(dist_to_plane > cell_reach) && (
-                        (cell_reach <= dist_vec(vec_p, vec_a)) ||
-                        (cell_reach <= dist_vec(vec_p, vec_b)) ||
-                        (cell_reach <= dist_vec(vec_p, vec_c)) ||
-                        (cell_reach <= line_and_point_to_dist(vec_a, vec_b, vec_p)) ||
-                        (cell_reach <= line_and_point_to_dist(vec_a, vec_c, vec_p)) ||
-                        (cell_reach <= line_and_point_to_dist(vec_b, vec_c, vec_p)) ||
-                        (same_side(vec_a, vec_b, vec_c, vec_p) && same_side(vec_b, vec_c, vec_a, vec_p) && same_side(vec_c, vec_a, vec_b, vec_p))
-                    )
+        for(var x = min_x; x<= max_x; x++){
+            for(var y = min_y; y<= max_y; y++){
+                for(var z = min_z; z<= max_z; z++){
+                    space.cells[x][y][z] |= (+triBoxOverlap(space_to_cell_center([x,y,z]), cell_half_size, face))<<type
                 }
             }
         }
     })
 
-    const flood_space_r = (bit_check, bit_set, accept_set, x, y, z) => {
-        //console.log([x, y, z])
-        var out = []
-        x+1 < space.length       && !space[x+1][y][z][bit_set] && (!space[x+1][y][z][bit_check] || accept_set.some(a => space[x+1][y][z][a])) && (space[x+1][y][z][bit_set] = true) && out.push([x+1, y, z])
-        x-1 >= 0                 && !space[x-1][y][z][bit_set] && (!space[x-1][y][z][bit_check] || accept_set.some(a => space[x-1][y][z][a])) && (space[x-1][y][z][bit_set] = true) && out.push([x-1, y, z])
-        y+1 < space[x].length    && !space[x][y+1][z][bit_set] && (!space[x][y+1][z][bit_check] || accept_set.some(a => space[x][y+1][z][a])) && (space[x][y+1][z][bit_set] = true) && out.push([x, y+1, z])
-        y-1 >= 0                 && !space[x][y-1][z][bit_set] && (!space[x][y-1][z][bit_check] || accept_set.some(a => space[x][y-1][z][a])) && (space[x][y-1][z][bit_set] = true) && out.push([x, y-1, z])
-        z+1 < space[x][y].length && !space[x][y][z+1][bit_set] && (!space[x][y][z+1][bit_check] || accept_set.some(a => space[x][y][z+1][a])) && (space[x][y][z+1][bit_set] = true) && out.push([x, y, z+1])
-        z-1 >= 0                 && !space[x][y][z-1][bit_set] && (!space[x][y][z-1][bit_check] || accept_set.some(a => space[x][y][z-1][a])) && (space[x][y][z-1][bit_set] = true) && out.push([x, y, z-1])
-        //console.log(out)
-        return out
-    }
+    process.stdout.write("#")
 
-    const flood_space = ((bit_check, bit_set, accept_set) => {
-        space[0][0][0][bit_set] = true;
-        var stack = [[[0,0,0]]]
-        while(stack.length >0){
-            var frame = stack.pop()
-            for(var i = 0; i<frame.length; i++){
-                stack.push(flood_space_r(bit_check, bit_set, accept_set, frame[i][0], frame[i][1], frame[i][2]))
-            }
-        }
-    })
-
-    const apply_obj = ((obj_content, bit_set, cell_reach) => {
-            obj_content.models.forEach(model =>
-                model.faces.forEach(face =>{
-                    fill_tri(
-                        model.vertices[face.vertices[0].vertexIndex-1],
-                        model.vertices[face.vertices[1].vertexIndex-1],
-                        model.vertices[face.vertices[2].vertexIndex-1],
-                        bit_set,
-                        cell_reach)
-                    }
-                )
-            )
-    })
-
-
-    obj_list.forEach((obj_file, index) => apply_obj(obj_file, index, cell_reach))
-
-    //flood_space(0, 1, [2,3,4,5])
-    //flood_space(2, 3, [])
-    //flood_space(4, 5, [])
-    /*
-    for(var z = 0; z<z_len; z++){
-        console.log("\nz = "+z.toString().padStart(3)+"  0123456789012345678901234567890123456789012")
-        for(var y = 0; y<y_len; y++){
-            console.log("y = "+y.toString().padStart(3)+": " + space.map(x => x[y][z]).map(data => {
-                if(data[4]){
-                    return 'G'.brightGreen
-                }else if(!data[5]){
-                    return 'g'.green
-                }else if(data[2]){
-                    return 'D'.brightRed
-                }else if(!data[3]){
-                    return 'd'.red
-                }else if(data[0]){
-                    return '#'.brightBlue
-                }else if(!data[1]){
-                    return '.'.blue
-                }else{
-                    return ' '
-                }
-            }).join(''))
-        }
-    }
-    */
-    return make_devs_json(query, space, x_off, y_off, z_off)
+    return space
 }
+function planeBoxOverlap(normal, vert, maxbox) {
+  var vmin = [0,0,0]
+  var vmax = [0,0,0]
 
-function make_devs_json(query, space, x_off, y_off, z_off){
-    var devs = {
-        "scenario": {
-            "offset_vector" : [x_off, y_off, z_off],
-            "shape": [space.length, space[0].length, space[0][0].length],
-            "wrapped": false,
-            "default_delay": "transport",
-            "default_cell_type": "CO2_cell",
-            "default_state": query.default_state,
-            "default_config": {
-                "CO2_cell": {
-                    "conc_increase": 143.2,
-                    "base": 500,
-                    "resp_time": 5,
-                    "window_conc": 400,
-                    "vent_conc": 300
-                }
-            },
-            "neighborhood": [
-                {
-                    "type": "von_neumann",
-                    "range": 1
-                }
-            ]
-        },
-        "cells": []
+  for (var q = 0; q <= 2; q++) {
+    var v = vert[q]
+    if (normal[q] > 0) {
+      vmin[q] = -maxbox[q] - v
+      vmax[q] = maxbox[q] - v
+    }else{
+      vmin[q] = maxbox[q] - v
+      vmax[q] = -maxbox[q] - v
     }
-    for(var x = 0; x<space.length; x++){
-        for(var y = 0; y<space[x].length; y++){
-            for(var z = 0; z<space[x][y].length; z++){
-                var index = -1
-                space[x][y][z].forEach((flag, i) => {if(flag){index = i}})
-                if(index >= 0){
-                    //console.log(JSON.stringify(space[x][y][z]))
-                    devs.cells.push({"cell_id":[x,y,z], "state":query.parts[index].state})
-                }
-            }
-        }
-    }
-    return devs
+  }
+  if ((normal[0] * vmin[0] + normal[1] * vmin[1] + normal[2] * vmin[2]) > 0){
+    return false
+  }else if ((normal[0] * vmax[0] + normal[1] * vmax[1] + normal[2] * vmax[2]) >= 0){
+    return true
+  }else{
+    return false
+  }
 }
 
 
+/*
+ * boxcenter is an array of 3 numbers, [x, y, z] representing the center of the cell
+ *
+ * boxhalfsize is an array of 3 numbers, [x_length/2, y_length/2, z_length/2] representing the side lengths of the cell, halved.
+ *
+ * triverts is an array of 3 arrays of numbers, [[ax, ay, az], [bx, by, bz], [cx, cy, cz]] representing the 3 vertexes of the triangle a, b, and c
+ *
+ */
+function triBoxOverlap(boxcenter, boxhalfsize, triverts) {
+  var v0 = [0,0,0]
+  var v1 = [0,0,0]
+  var v2 = [0,0,0]
 
+  var min, max, p0, p1, p2, rad, fex, fey, fez
+
+  var normal = [0,0,0]
+  var e0 = [0,0,0]
+  var e1 = [0,0,0]
+  var e2 = [0,0,0]
+
+  v0[0] = triverts[0][0] - boxcenter[0]
+  v0[1] = triverts[0][1] - boxcenter[1]
+  v0[2] = triverts[0][2] - boxcenter[2]
+
+  v1[0] = triverts[1][0] - boxcenter[0]
+  v1[1] = triverts[1][1] - boxcenter[1]
+  v1[2] = triverts[1][2] - boxcenter[2]
+
+  v2[0] = triverts[2][0] - boxcenter[0]
+  v2[1] = triverts[2][1] - boxcenter[1]
+  v2[2] = triverts[2][2] - boxcenter[2]
+
+
+  e0[0] = v1[0] - v0[0]
+  e0[1] = v1[1] - v0[1]
+  e0[2] = v1[2] - v0[2]
+
+  e1[0] = v2[0] - v1[0]
+  e1[1] = v2[1] - v1[1]
+  e1[2] = v2[2] - v1[2]
+
+  e2[0] = v0[0] - v2[0]
+  e2[1] = v0[1] - v2[1]
+  e2[2] = v0[2] - v2[2]
+
+  fex = Math.abs(e0[0])
+  fey = Math.abs(e0[1])
+  fez = Math.abs(e0[2])
+  p0 = e0[2] * v0[1] - e0[1] * v0[2]
+  p2 = e0[2] * v2[1] - e0[1] * v2[2]
+  if (p0 < p2) {
+    min = p0
+    max = p2
+  } else {
+    min = p2
+    max = p0
+  }
+  rad = fez * boxhalfsize[1] + fey * boxhalfsize[2]
+  if (min > rad || max < -rad){
+    return false;
+  }
+  p0 = -e0[2] * v0[0] + e0[0] * v0[2]
+  p2 = -e0[2] * v2[0] + e0[0] * v2[2]
+  if (p0 < p2) {
+    min = p0;
+    max = p2;
+  } else {
+    min = p2;
+    max = p0;
+  }
+  rad = fez * boxhalfsize[0] + fex * boxhalfsize[2]
+  if (min > rad || max < -rad){
+    return false
+  }
+  p1 = e0[1] * v1[0] - e0[0] * v1[1]
+  p2 = e0[1] * v2[0] - e0[0] * v2[1]
+  if (p2 < p1) {
+    min = p2
+    max = p1
+  } else {
+    min = p1
+    max = p2
+  }
+  rad = fey * boxhalfsize[0] + fex * boxhalfsize[1]
+  if (min > rad || max < -rad){
+    return false
+  }
+
+  fex = Math.abs(e1[0])
+  fey = Math.abs(e1[1])
+  fez = Math.abs(e1[2])
+  p0 = e1[2] * v0[1] - e1[1] * v0[2]
+  p2 = e1[2] * v2[1] - e1[1] * v2[2]
+  if (p0 < p2) {
+    min = p0
+    max = p2
+  } else {
+    min = p2
+    max = p0
+  }
+  rad = fez * boxhalfsize[1] + fey * boxhalfsize[2]
+  if (min > rad || max < -rad){
+    return false
+  }
+  p0 = -e1[2] * v0[0] + e1[0] * v0[2]
+  p2 = -e1[2] * v2[0] + e1[0] * v2[2]
+  if (p0 < p2) {
+    min = p0
+    max = p2
+  } else {
+    min = p2
+    max = p0
+  }
+  rad = fez * boxhalfsize[0] + fex * boxhalfsize[2]
+  if (min > rad || max < -rad){
+    return false
+  }
+  p0 = e1[1] * v0[0] - e1[0] * v0[1]
+  p1 = e1[1] * v1[0] - e1[0] * v1[1]
+  if (p0 < p1) {
+    min = p0
+    max = p1
+  } else {
+    min = p1
+    max = p0
+  }
+  rad = fey * boxhalfsize[0] + fex * boxhalfsize[1]
+  if (min > rad || max < -rad){
+    return false
+  }
+
+  fex = Math.abs(e2[0])
+  fey = Math.abs(e2[1])
+  fez = Math.abs(e2[2])
+  p0 = e2[2] * v0[1] - e2[1] * v0[2]
+  p1 = e2[2] * v1[1] - e2[1] * v1[2]
+  if (p0 < p1) {
+    min = p0
+    max = p1
+  } else {
+    min = p1
+    max = p0
+  }
+  rad = fez * boxhalfsize[1] + fey * boxhalfsize[2]
+  if (min > rad || max < -rad){
+    return false
+  }
+  p0 = -e2[2] * v0[0] + e2[0] * v0[2]
+  p1 = -e2[2] * v1[0] + e2[0] * v1[2]
+  if (p0 < p1) {
+    min = p0
+    max = p1
+  } else {
+    min = p1
+    max = p0
+  }
+  rad = fez * boxhalfsize[0] + fex * boxhalfsize[2]
+  if (min > rad || max < -rad){
+    return false
+  }
+  p1 = e2[1] * v1[0] - e2[0] * v1[1]
+  p2 = e2[1] * v2[0] - e2[0] * v2[1]
+  if (p2 < p1) {
+    min = p2
+    max = p1
+  } else {
+    min = p1
+    max = p2
+  }
+  rad = fey * boxhalfsize[0] + fex * boxhalfsize[1]
+  if (min > rad || max < -rad){
+    return false
+  }
+  min = max = v0[0]
+  if (v1[0] < min){
+    min = v1[0]
+  }
+  if (v1[0] > max){
+    max = v1[0]
+  }
+  if (v2[0] < min){
+    min = v2[0]
+  }
+  if (v2[0] > max){
+    max = v2[0]
+  }
+  if (min > boxhalfsize[0] || max < -boxhalfsize[0]){
+    return false
+  }
+  min = max = v0[1]
+  if (v1[1] < min){
+    min = v1[1]
+  }
+  if (v1[1] > max){
+    max = v1[1]
+  }
+  if (v2[1] < min){
+    min = v2[1]
+  }
+  if (v2[1] > max){
+    max = v2[1]
+  }
+
+  if (min > boxhalfsize[1] || max < -boxhalfsize[1]){
+    return false
+  }
+  min = max = v0[2]
+  if (v1[2] < min){
+    min = v1[2]
+  }
+  if (v1[2] > max){
+    max = v1[2]
+  }
+  if (v2[2] < min){
+    min = v2[2]
+  }
+  if (v2[2] > max){
+    max = v2[2]
+  }
+  if (min > boxhalfsize[2] || max < -boxhalfsize[2]){
+    return false
+  }
+  normal[0] = e0[1] * e1[2] - e0[2] * e1[1]
+  normal[1] = e0[2] * e1[0] - e0[0] * e1[2]
+  normal[2] = e0[0] * e1[1] - e0[1] * e1[0]
+
+
+  if (!planeBoxOverlap(normal, v0, boxhalfsize)){
+    return false
+  }
+
+  return true
+}
 
 module.exports = router;

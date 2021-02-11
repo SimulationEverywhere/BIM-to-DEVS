@@ -1,0 +1,169 @@
+{
+	"Playback_FastBackward" : {
+		"en" : "Go to first frame"
+	},
+	"Playback_StepBack" : {
+		"en" : "Step back"
+	},
+	"Playback_Backwards" : {
+		"en" : "Play backwards"
+	},
+	"Playback_Play" : {
+		"en" : "Play forward"
+	},
+	"Playback_StepForward" : {
+		"en" : "Step forward"
+	},
+	"Playback_FastForward" : {
+		"en" : "Go to last frame"
+	},
+	"Playback_Seek" : {
+		"en" : "Slide to seek frame"
+	},
+	"Playback_Record" : {
+		"en" : "Record simulation to .webm"
+	},
+	"Settings_Title" : {
+		"en" : "Settings"
+	},
+	"Settings_Diagram_Options" : {
+		"en" : "Diagram options"
+	},	
+	"Settings_Diagram_Height" : {
+		"en" : "Height:"
+	},
+	"Settings_Diagram_Width" : {
+		"en" : "Width:"
+	},
+	"Settings_Diagram_Aspect" : {
+		"en" : "Simulation aspect ratio:"
+	},
+	"Settings_Grid_Options" : {
+		"en" : "Grid options"
+	},	
+	"Settings_Grid_ShowGrid" : {
+		"en" : "Show grid:"
+	},
+	"Settings_Grid_Columns" : {
+		"en" : "Columns:"
+	},
+	"Settings_Grid_Width" : {
+		"en" : "Width:"
+	},
+	"Settings_Grid_Height" : {
+		"en" : "Height:"
+	},
+	"Settings_Grid_Aspect" : {
+		"en" : "Simulation aspect ratio:"
+	},
+	"Settings_Grid_Spacing" : {
+		"en" : "Spacing:"
+	},
+	"Settings_Playback_Options" : {
+		"en" : "Playback options"
+	},	
+	"Settings_Playback_Speed" : {
+		"en" : "Playback speed:"
+	},
+	"Settings_Playback_Loop" : {
+		"en" : "Loop:"
+	},
+	"Settings_Playback_Cache" : {
+		"en" : "Cache step:"
+	},
+	"Loader_Clear" : {
+		"en" : "Clear"
+	},
+	"Settings_Save" : {
+		"en" : "Save"
+	},
+	"Settings_Layers" : {
+		"en" : "Modify grids"
+	},
+	"Settings_Styles" : {
+		"en" : "Modify style no."
+	},
+	"Settings_Layers_Z" : {
+		"en" : "Z"
+	},
+	"Settings_Layers_Ports" : {
+		"en" : "Ports"
+	},
+	"Settings_Layers_Styles" : {
+		"en" : "Style"
+	},
+	"Settings_Layers_Style" : {
+		"en" : "Style"
+	},
+	"Settings_Layers_Style_Title" : {
+		"en" : "Modify the style for grid"
+	},
+	"Settings_Layers_Delete_Title" : {
+		"en" : "Remove grid no from visualization"
+	},
+	"Settings_Layers_Add_Title" : {
+		"en" : "Add another grid to the visualization"
+	},
+	"Settings_Layers_Cancel" : {
+		"en" : "Close"
+	},
+	"Settings_Layers_Apply" : {
+		"en" : "Apply"
+	},
+	"Settings_Class_Add_Title" : {
+		"en" : "Add a color classification to the visualization"
+	},
+	"Settings_Class_Delete_Title" : {
+		"en" : "Remove color classification from visualization"
+	},
+	"Settings_Styles_Add_New" : {
+		"en" : "Add new style..."
+	},
+	"Settings_Style_Start" : {
+		"en" : "Start"
+	},
+	"Settings_Style_End" : {
+		"en" : "End"
+	},
+	"Settings_Style_Color" : {
+		"en" : "Color"
+	},
+	"Settings_Layers_Add_Style_Title" : {
+		"en" : "Add a new style to the visualization"
+	},
+	"Settings_Layers_Del_Style_Title" : {
+		"en" : "Remove this style from the visualization"
+	},
+	"Loader_Parse" : {
+		"en" : "Load simulation"
+	},
+	"Diagram_Tooltip_X" : {
+		"en" : "<b>{0}</b> received an input (<b>{1}</b>) from <b>{2}</b> through port <b>{3}</b>"		
+	},
+	"Diagram_Tooltip_Y" : {
+		"en" : "<b>{0}</b> emitted an output (<b>{1}</b>) through port <b>{2}</b>"		
+	},
+	"Grid_Tooltip_Title" : {
+		"en" : "The state of cell <b>({0}, {1}, {2})</b> on port <b>{4}</b> is <b>{3}</b>."		
+	},
+    "Typeahead_Title": {
+        "en": "A Filtered list of items will appear after 3 characters are entered.",
+        "fr": "Une liste filtrée d'objets apparaîtra lorsque 3 caractères auront été entrés."
+    },
+    "Popup_Close": {
+        "en": "Close",
+        "fr": "Fermer"
+    },
+    "Dropzone_Upload_Label": {
+        "en": "DRAG AND DROP<BR> FILES HERE",
+        "fr": "GLISSER ET DÉPOSER<BR> LES FICHIERS ICI"
+    },
+    "Dropzone_Upload_Files": {
+        "en": "FILES LOADED:",
+        "fr": "FICHIERS CHARGÉS:"
+    },
+	"Dropzone_File_Title" : {
+		"en" : "Click to remove file",
+		"fr" : "Cliquer pour retirer le fichier"
+	}
+}

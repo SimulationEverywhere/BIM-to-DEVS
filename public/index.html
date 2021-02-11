@@ -17,8 +17,27 @@
   <link href="css/main.css" rel="stylesheet" />
   <script src="js/ForgeTree.js"></script>
   <script src="js/ForgeViewer.js"></script>
-  <script src="/js/dataextractExtension.js"></script>
 
+  <!-- <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+  <script src="/data/readData.js"></script>
+  <script src="/js/pointcloud.js"></script>
+
+  <script src="https://d3js.org/d3-dsv.v1.min.js"></script>
+  <script src="https://d3js.org/d3-fetch.v1.min.js"></script>
+  <link rel="stylesheet" href="css/main.css">
+  <script src="https://d3js.org/d3.v4.min.js" charset="utf-8"></script> -->
+
+  <!-- //external files created by Mitali Patel -->
+  <script type="module" src="js/pointcloud.js" ></script>
+  <script type="module" src="js/callingFunc.js"></script>
+  <!-- <script type="module" src="js/IntegrationCode.js" ></script> -->
+  <script type="module" src="api-web-devs/widgets/loader.js"></script>
+  <script type="module" src="api-web-devs/parsers/standardized.js"></script>
+  <script src="api-web-devs/references/StreamSaver/StreamSaver.js"></script>
+  <script src="api-web-devs/references/StreamSaver/zip-stream.js"></script>
+  <script src="api-web-devs/references/zip/zip.js"></script>
+  
+  
 </head>
 <body>
   <!-- Fixed navbar by Bootstrap: https://getbootstrap.com/examples/navbar-fixed-top/ -->
@@ -52,6 +71,8 @@
       </div>
       <div class="col-sm-8 fill">
         <div id="forgeViewer"></div>
+        <div id="loading"></div>
+       
       </div>
     </div>
   </div>

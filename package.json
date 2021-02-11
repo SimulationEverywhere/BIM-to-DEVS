@@ -1,17 +1,20 @@
 {
-  "name": "firsttry",
+  "name": "research-project-vstool",
   "version": "1.0.0",
-  "description": "First try at forge",
+  "description": "Forge sample",
   "main": "start.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node start.js"
   },
-  "author": "Vinu",
-  "license": "ISC",
+  "keywords": [
+    "forge"
+  ],
+  "author": "Mitali Patel",
+  "license": "MIT",
   "dependencies": {
-    "cookie-session": "^1.4.0",
     "express": "^4.17.1",
-    "forge-apis": "^0.7.3",
+    "forge-apis": "^0.8.4",
     "multer": "^1.4.2"
   }
 }

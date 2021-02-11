@@ -22,9 +22,17 @@ html, body {
     width: 100%;
   }
 
-  .DataExtractExtensionIcon {
-    background-image: url(/img/dataextraction.png);
+  .connectCadmiumIcon{
+    background-image: url(https://github.com/encharm/Font-Awesome-SVG-PNG/raw/master/white/png/24/object-group.png);
+    background-size: 24px;
+    background-repeat: no-repeat;
+    background-position: center;
+  }
+
+  .pointcloudIcon {
+    background-image: url(https://github.com/encharm/Font-Awesome-SVG-PNG/raw/master/white/png/24/object-group.png);
     background-size: 24px;
     background-repeat: no-repeat;
     background-position: center;
 }
+  

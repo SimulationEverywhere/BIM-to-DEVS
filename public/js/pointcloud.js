@@ -1,4 +1,4 @@
-import Loader from './callingFunc.js'
+import Loader from './loading.js'
 
 let geometry;
 

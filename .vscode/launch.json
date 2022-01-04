@@ -12,7 +12,7 @@
             "env": {
                 "FORGE_CLIENT_ID": "uCGRfVbFJgMK0EYr5J1kmeCgROH9wwSA",
                 "FORGE_CLIENT_SECRET": "wL8AwIMDGMeggiH5",
-                "FORGE_CALLBACK_URL": "http://localhost:3000/api/forge/callback/oauth"
+                "FORGE_CALLBACK_URL": "http://localhost:3000/api/forge/oauth/callback"
             }
         }
     ]

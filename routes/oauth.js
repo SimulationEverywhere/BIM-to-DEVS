@@ -5,7 +5,7 @@ const { OAuth } = require('./common/oauth');
 
 let router = express.Router();
 
-router.get('/callback/oauth', async(req, res, next) => {
+router.get('/oauth/callback', async(req, res, next) => {
     const { code } = req.query;
     const oauth = new OAuth(req.session);
     try {

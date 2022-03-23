@@ -1,46 +1,91 @@
+from __future__ import annotations
 import json
 from math import inf
-from typing import List, Tuple
 
 
-cell_size = (1, 1, 1)       # Dimension for each cell (in this case, each cell is a cubic meter)
-default_cell_type = 'Air'   # By default, all cells are of type 'Air'
-min_points = 3              # By default, we need at least 3 points inside a cell to reconsider its type
-
-# Default scenario configuration
-scenario = {
-    'wrapped': False,
-    'default_delay': 'inertial',
-    'default_cell_type': 'CO2_cell',
-    'default_state': {
-        'counter': -1,
-        'concentration': 500,
-        'type': -100,
-    },
-    'default_config': {
-        'CO2_cell': {
-            'conc_increase': 143.2,
-            'base': 500,
-            'resp_time': 5,
-            'window_conc': 400,
-            'vent_conc': 300,
-        }
-    },
-    'neighborhood': [{'type': 'von_neumann', 'range': 1}]
-}
-
-# Dictionary containing all the different cell types and their corresponding value
+# Dictionary containing all the different BIM object IDs and their corresponding initial cell configuration ID
 cell_types = {
-    'Air': -100,
-    'Wall': -300,
-    'Window': -500,
-    'Chair': -200,
-    'Door': -400,
-    'Mechanical Equipmen': -600
+    'Wall': 'wall',
+    'Window': 'window',
+    'Chair': 'source',
+    'Door': 'doors',
+    'Mechanical Equipmen': 'vents',
+    'Workstation': 'workstation',
 }
 
 
-def get_cell_type(data_in: List[Tuple[str, str]], default_type: str = 'Air', min_points: float = 3) -> int:
+def build_default_config(shape: tuple[int, ...], cell_size: float):
+    return {
+        'shape': shape,
+        'wrapped': False,
+        'cells': {
+            'default': {
+                'delay': 'transport',
+                'cell_type': 'CO2_cell',
+                'state': {
+                    'counter': -1,
+                    'concentration': 500,
+                    'type': -100,
+                    'breathing_counter': 0,
+                },
+                'config': {
+                    'co2_production': 0.0155,
+                    'cell_size': cell_size,
+                    'base': 500,
+                    'resp_time': 1,
+                    'window_conc': 400,
+                    'vent_conc': 400,
+                    'breathing_rate': 5,
+                    'time_active': 500,
+                    'start_time': 50,
+                },
+                'neighborhood': [
+                    {
+                        'type': 'von_neumann',
+                        'range': 1,
+                        'vicinity': 0,
+                    },
+                ],
+            },
+            'wall': {
+                'state': {
+                    'concentration': 0,
+                    'type': -300,  # We don't need to specify counter, as it matches the default one
+                },
+            },
+            'window': {
+                'state': {
+                    'concentration': 400,
+                    'type': -500,
+                },
+            },
+            'doors': {
+                'state': {
+                    'type': -400,  # We don't need to specify concentration, as it matches the default one
+                },
+            },
+            'source': {
+                'state': {
+                    'type': -200,
+                },
+            },
+            'vents': {
+                'state': {
+                    'concentration': 300,
+                    'type': -600,
+                },
+            },
+            'workstation': {
+                'state': {
+                    'type': -700,
+                },
+            },
+        },
+        'cell_map': {},
+    }
+
+
+def get_cell_type(data_in: list[tuple[str, str]], default_type: str = 'Air', min_points: float = 3) -> str | None:
     """
     From a tuple of raytraced points within a single cell, this function returns the corresponding cell type
 
@@ -63,10 +108,15 @@ def get_cell_type(data_in: List[Tuple[str, str]], default_type: str = 'Air', min
             point = data_type
             n_times = n_hits
     # We return the cell type ID corresponding to the cell
-    return cell_types[point]
+    return cell_types.get(point)
 
 
 if __name__ == '__main__':
+    cell_size = (1, 1, 1)  # Dimension for each cell (in this case, each cell is a cubic meter)
+    default_cell_type = 'Air'  # By default, all cells are of type 'Air'
+    min_points = 3  # By default, we need at least 3 points inside a cell to reconsider its type
+
+    # We create a new scenario configuration
     # We read the JSON file
     with open('data/raytrace.json') as f:
         raw = json.load(f)
@@ -97,25 +147,16 @@ if __name__ == '__main__':
     for cell_id in data_cell:
         shape = tuple(max(shape[i], cell_id[i]) for i in range(len(shape)))
     shape = tuple(shape[i] + 1 for i in range(len(shape)))
-    scenario['shape'] = shape
+    json_file = build_default_config(shape, 25)  # TODO where does 25 come from?
 
     # We add the custom configuration for those cells that have at least one raytraced point
-    cells = list()
     for cell_id, data in data_cell.items():
-        aux = {
-            'cell_id': cell_id,
-            'state': {
-                'concentration': 500,
-                'type': get_cell_type(data),
-                'counter': -1,
-            },
-        }
-        cells.append(aux)
+        cell_type = get_cell_type(data, default_cell_type, min_points)
+        if cell_type is not None:
+            if cell_type not in json_file['cell_map']:
+                json_file['cell_map'][cell_type] = list()
+            json_file['cell_map'][cell_type].append(cell_id)
 
     # We store the outcome in a JSON file
-    json_file = {
-        'scenario': scenario,
-        'cells': cells,
-    }
     with open('data/celldevs_data.json', 'w') as f:
         json.dump(json_file, f, indent=4)

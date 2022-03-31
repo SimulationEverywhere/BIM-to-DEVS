@@ -7,10 +7,15 @@ function launchViewer(urn) {
   };
 
   Autodesk.Viewing.Initializer(options, () => {
-    viewer = new Autodesk.Viewing.GuiViewer3D(document.getElementById('forgeViewer'), { extensions: [ 'Autodesk.DocumentBrowser',
-    'IntegrationCode',
-    'CallingFunction',
-    'PointCloudExtension'] });
+    viewer = new Autodesk.Viewing.GuiViewer3D(document.getElementById('forgeViewer'), { 
+      extensions: [ 
+    'Autodesk.DocumentBrowser',
+    // 'IntegrationCode',
+    // 'CallingFunction',
+    'PointCloudExtension'
+    // 'GisToolExtension'
+  ] 
+  });
     viewer.start();
     var documentId = 'urn:' + urn;
     Autodesk.Viewing.Document.load(documentId, onDocumentLoadSuccess, onDocumentLoadFailure);
@@ -20,7 +25,7 @@ function launchViewer(urn) {
 function onDocumentLoadSuccess(doc) {
   var viewables = doc.getRoot().getDefaultGeometry();
   viewer.loadDocumentNode(doc, viewables).then(i => {
-    // documented loaded, any action?
+    //
   });
 }
 
